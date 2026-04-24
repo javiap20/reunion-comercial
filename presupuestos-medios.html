@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Presupuestos Medios</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f4f5f7;
+  --bg2: #ffffff;
+  --bg3: #f0f1f4;
+  --bg4: #e4e6ec;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.13);
+  --text: #1a1a2e;
+  --text2: #3a3a5c;
+  --text3: #7a7a9a;
+  --accent: #2563eb;
+  --accent2: #1d4ed8;
+  --green: #16a34a;
+  --coral: #dc2626;
+  --amber: #b45309;
+  --purple: #7c3aed;
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  padding: 0;
+}
+.mono { font-family: 'DM Mono', monospace; }
+
+/* TOPBAR */
+.topbar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+.topbar-brand {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.topbar-brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; }
+.data-badge {
+  font-size: 11px; color: var(--text3);
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 6px; padding: 3px 10px;
+  font-family: 'DM Mono', monospace;
+}
+
+/* UPLOAD AREA */
+.upload-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 56px);
+  gap: 20px;
+}
+
+/* LOADING SPINNER */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px;
+}
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--bg4);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 14px; color: var(--text3); }
+
+.upload-zone {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  border: 1.5px dashed var(--border2); border-radius: 16px;
+  padding: 36px 48px; text-align: center; cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  background: var(--bg2);
+  max-width: 380px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: rgba(37,99,235,0.03); }
+.upload-zone .up-icon { font-size: 36px; }
+.upload-zone .up-title { font-size: 16px; font-weight: 600; color: var(--text); }
+.upload-zone .up-sub { font-size: 12px; color: var(--text3); line-height: 1.7; }
+.upload-zone .up-btn {
+  background: var(--accent2); color: #fff; border: none;
+  border-radius: 8px; padding: 10px 24px;
+  font-size: 14px; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; font-weight: 500;
+  transition: background 0.15s;
+}
+.upload-zone .up-btn:hover { background: var(--accent); }
+
+/* CONTROLS WRAPPER */
+#controls { display: none; }
+
+/* FILTER BLOCKS */
+.filter-block {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+}
+.filter-block-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text3);
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+.filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+.filter-group { display: flex; flex-direction: column; gap: 4px; }
+.filter-group label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text3);
+  font-weight: 500;
+}
+.filter-group select, .filter-group input {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 7px 12px;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  outline: none;
+  min-width: 140px;
+}
+.filter-group select:focus, .filter-group input:focus { border-color: var(--accent); }
+.filter-group input { min-width: 200px; }
+
+/* MONTH CHIPS */
+.months-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.month-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1.5px solid var(--border2);
+  background: var(--bg3);
+  color: var(--text2);
+  user-select: none;
+  transition: all 0.13s;
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+}
+.month-chip:hover { border-color: var(--accent); background: rgba(37,99,235,0.05); }
+.month-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.month-chip.chip-all { font-style: italic; color: var(--text3); }
+.month-chip.chip-all.active {
+  background: var(--bg4);
+  border-color: var(--border2);
+  color: var(--text2);
+  font-style: normal;
+  font-weight: 500;
+}
+
+/* ZERO TOGGLE */
+.zero-toggle-wrap {
+  display: flex;
+  gap: 0;
+  border: 1.5px solid var(--border2);
+  border-radius: var(--radius);
+  overflow: hidden;
+  align-self: flex-end;
+}
+.zero-btn {
+  padding: 7px 14px;
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  border: none;
+  background: var(--bg3);
+  color: var(--text3);
+  font-weight: 500;
+  transition: all 0.15s;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  line-height: 1.4;
+  text-align: center;
+}
+.zero-btn:first-child { border-right: 1px solid var(--border2); }
+.zero-btn.active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.zero-btn:not(.active):hover { background: var(--bg4); color: var(--text2); }
+
+/* MAIN CONTENT */
+.main { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+
+/* SUMMARY */
+.summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.summary-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  flex: 1;
+  min-width: 140px;
+}
+.summary-card .s-val {
+  font-size: 22px;
+  font-weight: 600;
+  font-family: 'DM Mono', monospace;
+  color: var(--text);
+  letter-spacing: -0.5px;
+}
+.summary-card .s-label { font-size: 11px; color: var(--text3); }
+.summary-card.accent { border-top: 3px solid var(--accent); }
+.summary-card.green  { border-top: 3px solid var(--green); }
+.summary-card.amber  { border-top: 3px solid var(--amber); }
+.summary-card.purple { border-top: 3px solid var(--purple); }
+
+/* NOTE */
+.info-note {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #1e40af;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.info-note.hidden { display: none; }
+.info-note .info-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+
+/* TABLE */
+.table-wrap {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th {
+  background: #e8eaf0;
+  font-size: 10px;
+  font-weight: 700;
+  color: #3a3a5c;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 10px 12px;
+  border-bottom: 2px solid #c8cad4;
+  white-space: nowrap;
+  text-align: left;
+}
+th.num { text-align: right; }
+td {
+  padding: 9px 12px;
+  border-bottom: 1px solid #e0e2e8;
+  font-size: 12px;
+  color: var(--text);
+  vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #f0f4ff !important; }
+td.num { text-align: right; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 600; }
+td.num-neutral { text-align: right; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); }
+td.neg { color: var(--coral) !important; }
+td.pos { color: var(--green) !important; }
+td.avg-col { text-align: right; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; color: var(--accent); }
+
+/* FAMILY GROUP HEADER */
+.family-header td {
+  background: #f0f1f6 !important;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 6px 12px;
+  border-bottom: 1px solid #dde0e8;
+}
+.family-header:hover td { background: #e8eaf0 !important; }
+
+/* BADGES */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.badge-D { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+.badge-P { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+.badge-E { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
+.badge-O { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+
+.empty-state { text-align: center; color: var(--text3); padding: 40px; font-size: 13px; }
+
+/* VS AÑO ANTERIOR */
+.vs-col { text-align: right; font-family: 'DM Mono', monospace; font-size: 11px; white-space: nowrap; }
+.vs-up {
+  color: var(--green);
+  font-weight: 700;
+}
+.vs-down {
+  color: var(--coral);
+  font-weight: 700;
+}
+.vs-neutral { color: var(--text3); font-weight: 500; }
+.vs-na { color: var(--text3); font-size: 10px; font-style: italic; }
+.vs-bruto { font-size: 10px; font-weight: 400; opacity: 0.8; display: block; margin-top: 1px; }
+
+/* SOURCE PILL */
+.source-pill {
+  font-size: 11px; padding: 3px 10px;
+  border-radius: 20px; font-family: 'DM Mono', monospace;
+}
+.source-pill.auto  { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+.source-pill.manual { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg4); }
+::-webkit-scrollbar-thumb { background: #9a9ab8; border-radius: 3px; }
+
+/* EXPAND TOGGLE */
+.expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--text3);
+  padding: 2px 4px;
+  margin-right: 4px;
+  transition: transform 0.18s;
+  line-height: 1;
+  vertical-align: middle;
+  -webkit-tap-highlight-color: transparent;
+}
+.expand-btn.open { transform: rotate(90deg); }
+
+/* SECTOR ROWS */
+.sector-row td {
+  background: #f6f7fa !important;
+  padding: 0;
+  border-bottom: none;
+}
+.sector-row:last-of-type td { border-bottom: 1px solid #e0e2e8; }
+.sector-inner {
+  padding: 8px 16px 8px 48px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.sector-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  white-space: nowrap;
+}
+.sector-chip .sc-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  color: var(--text2);
+  font-weight: 500;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sector-chip .sc-val { font-weight: 700; }
+.sc-above { color: var(--green); }
+.sc-below { color: var(--coral); }
+.sc-equal { color: var(--text3); }
+.sector-empty {
+  padding: 8px 16px 8px 48px;
+  font-size: 11px;
+  color: var(--text3);
+  font-style: italic;
+}
+
+/* TOOLTIP */
+.tooltip-wrap { position: relative; display: inline-block; }
+.tt-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--bg4);
+  border: 1px solid var(--border2);
+  font-size: 10px;
+  color: var(--text3);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  font-style: normal;
+  line-height: 1;
+  vertical-align: middle;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+.tt-trigger:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tooltip-box {
+  display: none;
+  position: fixed;
+  background: #1a1a2e;
+  color: #e8e8f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+  min-width: 760px;
+  max-width: 900px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  z-index: 9999;
+  font-size: 12px;
+  pointer-events: none;
+}
+.tt-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0 16px;
+}
+.tt-col-divider {
+  width: 1px;
+  background: rgba(255,255,255,0.08);
+  margin: 0 -8px;
+}
+.tooltip-box.tt-visible { display: block; }
+.tooltip-box::after {
+  content: '';
+  position: absolute;
+  border: 6px solid transparent;
+}
+.tooltip-box.tt-above::after {
+  top: 100%; left: 50%;
+  transform: translateX(-50%);
+  border-top-color: #1a1a2e;
+}
+.tooltip-box.tt-below::after {
+  bottom: 100%; left: 50%;
+  transform: translateX(-50%);
+  border-bottom-color: #1a1a2e;
+}
+.tt-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #7dd3fc;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  margin-bottom: 8px;
+  padding-bottom: 7px;
+  border-bottom: 1.5px solid rgba(125,211,252,0.35);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tt-title::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 13px;
+  background: #7dd3fc;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.tt-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 3px 0;
+  font-size: 11px;
+}
+.tt-row .tt-area { color: #b8b8d0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-row .tt-val { font-family: 'DM Mono', monospace; font-weight: 700; }
+.tt-above { color: #4ade80; }
+.tt-below { color: #f87171; }
+.tt-equal { color: #9999bb; }
+.tt-avg-line {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1.5px solid rgba(125,211,252,0.35);
+  font-size: 10px;
+  color: #7dd3fc;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  display: flex;
+  justify-content: space-between;
+}
+.tt-avg-line span { font-family: 'DM Mono', monospace; color: #aaaacc; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-brand"><span class="dot"></span>Presupuestos Medios</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span id="source-indicator" style="display:none"></span>
+    <div id="top-badge" class="data-badge" style="display:none">— registros</div>
+  </div>
+</div>
+
+<!-- UPLOAD / LOADING -->
+<div class="upload-wrap" id="upload-wrap">
+
+  <!-- Spinner mientras se intenta la carga automática -->
+  <div class="loading-state" id="auto-loading">
+    <div class="spinner"></div>
+    <div class="loading-text">Buscando archivo en el servidor…</div>
+  </div>
+
+  <!-- Zona manual: aparece si falla la auto-carga -->
+  <div class="upload-zone" id="upload-zone" style="display:none"
+    onclick="document.getElementById('file-input').click()"
+    ondragover="event.preventDefault();this.classList.add('drag')"
+    ondragleave="this.classList.remove('drag')"
+    ondrop="onDrop(event)">
+    <div class="up-icon">📊</div>
+    <div class="up-title">Cargar Excel</div>
+    <div class="up-sub">Arrastra tu <span class="mono" style="color:var(--text2)">PRINT Y DIGITAL.xlsx</span><br>o haz clic para buscarlo</div>
+    <button class="up-btn" onclick="event.stopPropagation();document.getElementById('file-input').click()">Elegir archivo</button>
+    <div style="font-size:11px;color:var(--text3);margin-top:4px" id="upload-msg"></div>
+  </div>
+
+</div>
+<input type="file" id="file-input" accept=".xlsx,.xls" style="display:none" onchange="onFileInput(this)">
+
+<!-- CONTROLS -->
+<div id="controls">
+  <div class="filter-block">
+    <div class="filter-block-title">Filtros principales</div>
+    <div class="filters-row">
+      <div class="filter-group">
+        <label>Año</label>
+        <select id="f-year" onchange="renderTable()"><option value="all">Todos</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Canal</label>
+        <select id="f-canal" onchange="renderTable()">
+          <option value="all">Todos</option>
+          <option value="DIGITAL">DIGITAL</option>
+          <option value="PRINT">PRINT</option>
+          <option value="EVENTOS">EVENTOS</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Buscar producto</label>
+        <input type="text" id="f-search" oninput="renderTable()" placeholder="Escribe para filtrar...">
+      </div>
+      <div class="filter-group">
+        <label>Ordenar por</label>
+        <select id="f-sort" onchange="renderTable()">
+          <option value="familia">Familia</option>
+          <option value="lineas">Nº líneas ↓</option>
+          <option value="neto">Ingreso neto ↓</option>
+          <option value="avg">Precio medio ↓</option>
+          <option value="nombre">Nombre A-Z</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Precio medio</label>
+        <div class="zero-toggle-wrap">
+          <button class="zero-btn active" id="btn-con-ceros" onclick="setZeroMode('con')">Con líneas a 0 €</button>
+          <button class="zero-btn" id="btn-sin-ceros" onclick="setZeroMode('sin')">Sin líneas a 0 €</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-block" style="border-bottom: 2px solid var(--border);">
+    <div class="filter-block-title">Meses</div>
+    <div class="months-row" id="months-row"></div>
+  </div>
+
+  <div class="main">
+    <div class="summary-bar" id="summary-bar"></div>
+    <div class="info-note hidden" id="info-note">
+      <span class="info-icon">💡</span>
+      <span id="info-text"></span>
+    </div>
+    <div class="table-wrap">
+      <div class="table-scroll">
+        <table>
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const COL_MES    = 'Mes inserción';
+const COL_PUB    = 'Publicación';
+const COL_ANUN   = 'Anunciante';
+const COL_MARCA  = 'Marca';
+const COL_FAM    = 'Familia';
+const COL_PROD   = 'Producto';
+const COL_YEAR   = 'Año inserción';
+const COL_ING    = 'Imp.Neto a Comisionar';
+const COL_AREA   = 'ÁREAS';
+const COL_SECTOR = 'Sector';
+const SHEET_NAME = 'Analizador general';
+
+// ── Rutas a intentar en orden. Edita este array para añadir o cambiar nombres.
+const AUTO_LOAD_PATHS = [
+  'PRINT Y DIGITAL.xlsx',
+  'datos.xlsx',
+  'data.xlsx',
+];
+
+const MESES_ORDER = ['01 Enero','02 Febrero','03 Marzo','04 Abril','05 Mayo','06 Junio','07 Julio','08 Agosto','09 Septiembre','10 Octubre','11 Noviembre','12 Diciembre'];
+const MESES_SHORT = {'01 Enero':'Ene','02 Febrero':'Feb','03 Marzo':'Mar','04 Abril':'Abr','05 Mayo':'May','06 Junio':'Jun','07 Julio':'Jul','08 Agosto':'Ago','09 Septiembre':'Sep','10 Octubre':'Oct','11 Noviembre':'Nov','12 Diciembre':'Dic'};
+
+const FAM_DIGITAL = new Set(['Curated','Display','Programatica Display Directo','Programatica Display Indirecto','Social Networks','Sponsorship','Video','Video Programatico Directo','Video Programatico Indirecto']);
+const FAM_PRINT   = new Set(['CERTIFICACIÓN','CONVENCIONAL','Curated','ELEMENTOS ESPECIALES','Otras facturaciones','Patrocinio','Sponsorship']);
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let DATA = [];
+let selectedMonths = new Set();
+let zeroMode = 'con';
+
+// ─── AUTO-LOAD ────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  tryAutoLoad(AUTO_LOAD_PATHS.slice());
+});
+
+async function tryAutoLoad(paths) {
+  if (paths.length === 0) {
+    showManualUpload('Archivo no encontrado en el servidor.');
+    return;
+  }
+  const path = paths.shift();
+  try {
+    const res = await fetch(path);
+    if (!res.ok) throw new Error('not ok');
+    // Rechazar si el servidor devuelve HTML (página de error 404 disfrazada)
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('text/html')) throw new Error('html response');
+    const buffer = await res.arrayBuffer();
+    processArrayBuffer(buffer, path, 'auto');
+  } catch (_) {
+    tryAutoLoad(paths);
+  }
+}
+
+function showManualUpload(msg) {
+  document.getElementById('auto-loading').style.display = 'none';
+  document.getElementById('upload-zone').style.display  = '';
+  if (msg) document.getElementById('upload-msg').textContent = msg;
+}
+
+// ─── CLASSIFY ─────────────────────────────────────────────────────────────────
+function classifyRow(row) {
+  const fam  = (row[COL_FAM]  || '').trim();
+  const prod = (row[COL_PROD] || '').trim();
+  if (fam === 'Eventos') return 'EVENTOS';
+  if (fam === 'Curated') {
+    if (prod === 'CURATED') return 'PRINT';
+    if (prod === 'Curated') return 'DIGITAL';
+    return FAM_DIGITAL.has(fam) ? 'DIGITAL' : 'PRINT';
+  }
+  if (fam === 'Sponsorship') {
+    if (prod === 'DOBLE PAGINA BRANDED' || prod === 'PAGINA BRANDED') return 'PRINT';
+    return 'DIGITAL';
+  }
+  if (FAM_DIGITAL.has(fam)) return 'DIGITAL';
+  if (FAM_PRINT.has(fam))   return 'PRINT';
+  return 'OTROS';
+}
+
+// ─── FORMAT ───────────────────────────────────────────────────────────────────
+function fmt(n) {
+  return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0, useGrouping: true }).format(n) + ' €';
+}
+function fmtNum(n) {
+  return new Intl.NumberFormat('es-ES', { useGrouping: true }).format(n);
+}
+
+// ─── FILE HANDLERS ────────────────────────────────────────────────────────────
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) processFile(f);
+}
+function onFileInput(input) {
+  const f = input.files[0];
+  if (f) processFile(f);
+}
+function processFile(file) {
+  document.getElementById('upload-msg').textContent = `Leyendo ${file.name}…`;
+  const reader = new FileReader();
+  reader.onload = e => processArrayBuffer(e.target.result, file.name, 'manual');
+  reader.readAsArrayBuffer(file);
+}
+
+function processArrayBuffer(buffer, fileName, source) {
+  try {
+    const wb = XLSX.read(buffer, { type: 'array' });
+    const sheetName = wb.SheetNames.includes(SHEET_NAME) ? SHEET_NAME : wb.SheetNames[0];
+    const raw = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' });
+    DATA = raw.map(row => ({
+      ...row,
+      _canal:   classifyRow(row),
+      _ingreso: parseFloat(row[COL_ING]) || 0,
+      _prod:    (row[COL_PROD] || '(sin producto)').trim(),
+      _fam:     (row[COL_FAM]  || '').trim(),
+      _year:    String(row[COL_YEAR] || '').trim(),
+      _mes:     String(row[COL_MES]  || '').trim(),
+      _area:    (row[COL_AREA]   || '').trim(),
+      _sector:  (row[COL_SECTOR] || '').trim(),
+      _pub:     (row[COL_PUB]   || '').trim(),
+    }));
+
+    document.getElementById('top-badge').style.display = '';
+    document.getElementById('top-badge').textContent = DATA.length.toLocaleString('es-ES') + ' registros · ' + fileName;
+
+    const ind = document.getElementById('source-indicator');
+    ind.style.display = '';
+    ind.innerHTML = source === 'auto'
+      ? '<span class="source-pill auto">⚡ Auto</span>'
+      : '<span class="source-pill manual">📂 Manual</span>';
+
+    populateFilters();
+    document.getElementById('upload-wrap').style.display = 'none';
+    document.getElementById('controls').style.display    = 'block';
+    renderTable();
+  } catch(err) {
+    if (source === 'auto') {
+      showManualUpload('Error al leer el archivo. Carga uno manualmente.');
+    } else {
+      document.getElementById('upload-msg').textContent = 'Error: ' + err.message;
+    }
+  }
+}
+
+// ─── POPULATE ─────────────────────────────────────────────────────────────────
+function populateFilters() {
+  const years = [...new Set(DATA.map(r => r._year).filter(Boolean))].sort();
+  const yrSel = document.getElementById('f-year');
+  yrSel.innerHTML = '<option value="all">Todos</option>';
+  years.forEach(y => {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y;
+    yrSel.appendChild(o);
+  });
+  buildMonthChips();
+}
+
+function buildMonthChips() {
+  const availableMeses = new Set(DATA.map(r => r._mes).filter(Boolean));
+  const meses = MESES_ORDER.filter(m => availableMeses.has(m));
+  const container = document.getElementById('months-row');
+  const allActive = selectedMonths.size === 0;
+  let html = `<span class="month-chip chip-all ${allActive ? 'active' : ''}" onclick="toggleMonth('all')">Todos</span>`;
+  meses.forEach(m => {
+    const active = selectedMonths.has(m);
+    const short  = MESES_SHORT[m] || m;
+    html += `<span class="month-chip ${active ? 'active' : ''}" data-mes="${m}" onclick="toggleMonth('${m}')">${short}</span>`;
+  });
+  container.innerHTML = html;
+}
+
+// ─── INTERACTIONS ─────────────────────────────────────────────────────────────
+function toggleMonth(mes) {
+  if (mes === 'all') selectedMonths.clear();
+  else {
+    if (selectedMonths.has(mes)) selectedMonths.delete(mes);
+    else selectedMonths.add(mes);
+  }
+  buildMonthChips();
+  renderTable();
+}
+
+function setZeroMode(mode) {
+  zeroMode = mode;
+  document.getElementById('btn-con-ceros').classList.toggle('active', mode === 'con');
+  document.getElementById('btn-sin-ceros').classList.toggle('active', mode === 'sin');
+  renderTable();
+}
+
+// ─── FILTER ───────────────────────────────────────────────────────────────────
+function getFiltered() {
+  const yr    = document.getElementById('f-year').value;
+  const canal = document.getElementById('f-canal').value;
+  return DATA.filter(r => {
+    if (yr    !== 'all' && r._year  !== yr)    return false;
+    if (canal !== 'all' && r._canal !== canal) return false;
+    if (selectedMonths.size > 0 && !selectedMonths.has(r._mes)) return false;
+    return true;
+  });
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function renderTable() {
+  const rows   = getFiltered();
+  const search = document.getElementById('f-search').value.toLowerCase().trim();
+  const sortBy = document.getElementById('f-sort').value;
+  const yr     = document.getElementById('f-year').value;
+
+  // ── Build current-year aggregates ──
+  const map = new Map();
+  rows.forEach(r => {
+    const key = r._prod + '|||' + r._canal;
+    if (!map.has(key)) map.set(key, {
+      prod: r._prod, canal: r._canal, fam: r._fam,
+      lineas: 0, pos: 0, neg: 0, cero: 0,
+      sumaPos: 0, sumaNeg: 0,
+      areaMap: new Map(),
+      sectorMap: new Map(),
+      pubMap: new Map(),
+    });
+    const g = map.get(key);
+    g.lineas++;
+    if (r._ingreso > 0)       { g.pos++;  g.sumaPos += r._ingreso; }
+    else if (r._ingreso < 0)  { g.neg++;  g.sumaNeg += r._ingreso; }
+    else                      { g.cero++; }
+    // area breakdown
+    const areaKey = r._area || '(sin área)';
+    if (!g.areaMap.has(areaKey)) g.areaMap.set(areaKey, { lineas: 0, cero: 0, sumaPos: 0, sumaNeg: 0 });
+    const ag = g.areaMap.get(areaKey);
+    ag.lineas++;
+    if (r._ingreso > 0)      { ag.sumaPos += r._ingreso; }
+    else if (r._ingreso < 0) { ag.sumaNeg += r._ingreso; }
+    else                     { ag.cero++; }
+    // sector breakdown
+    const sectorKey = r._sector || '(sin sector)';
+    if (!g.sectorMap.has(sectorKey)) g.sectorMap.set(sectorKey, { lineas: 0, cero: 0, sumaPos: 0, sumaNeg: 0 });
+    const sg = g.sectorMap.get(sectorKey);
+    sg.lineas++;
+    if (r._ingreso > 0)      { sg.sumaPos += r._ingreso; }
+    else if (r._ingreso < 0) { sg.sumaNeg += r._ingreso; }
+    else                     { sg.cero++; }
+    // publicación breakdown
+    const pubKey = r._pub || '(sin publicación)';
+    if (!g.pubMap.has(pubKey)) g.pubMap.set(pubKey, { lineas: 0, cero: 0, sumaPos: 0, sumaNeg: 0 });
+    const pg = g.pubMap.get(pubKey);
+    pg.lineas++;
+    if (r._ingreso > 0)      { pg.sumaPos += r._ingreso; }
+    else if (r._ingreso < 0) { pg.sumaNeg += r._ingreso; }
+    else                     { pg.cero++; }
+  });
+
+  // ── Build previous-year aggregates (only when a specific year is selected) ──
+  const prevMap = new Map();
+  if (yr !== 'all') {
+    const prevYr = String(parseInt(yr, 10) - 1);
+    const canal  = document.getElementById('f-canal').value;
+    DATA.filter(r => {
+      if (r._year !== prevYr) return false;
+      if (canal !== 'all' && r._canal !== canal) return false;
+      if (selectedMonths.size > 0 && !selectedMonths.has(r._mes)) return false;
+      return true;
+    }).forEach(r => {
+      const key = r._prod + '|||' + r._canal;
+      if (!prevMap.has(key)) prevMap.set(key, { lineas: 0, cero: 0, sumaPos: 0, sumaNeg: 0 });
+      const g = prevMap.get(key);
+      g.lineas++;
+      if (r._ingreso > 0)      { g.sumaPos += r._ingreso; }
+      else if (r._ingreso < 0) { g.sumaNeg += r._ingreso; }
+      else                     { g.cero++; }
+    });
+  }
+
+  let items = [...map.values()].map(g => {
+    const neto = g.sumaPos + g.sumaNeg;
+    const avgCon  = g.lineas > 0 ? neto / g.lineas : 0;
+    const lineasSinCero = g.lineas - g.cero;
+    const avgSin  = lineasSinCero > 0 ? neto / lineasSinCero : 0;
+
+    // Previous year comparison
+    let avgPrev = null;
+    if (yr !== 'all') {
+      const key = g.prod + '|||' + g.canal;
+      const p = prevMap.get(key);
+      if (p) {
+        const pNeto = p.sumaPos + p.sumaNeg;
+        if (zeroMode === 'con') {
+          avgPrev = p.lineas > 0 ? pNeto / p.lineas : 0;
+        } else {
+          const pSinCero = p.lineas - p.cero;
+          avgPrev = pSinCero > 0 ? pNeto / pSinCero : 0;
+        }
+      }
+    }
+
+    // Compute area averages (for tooltip)
+    const areas = [];
+    g.areaMap.forEach((ag, areaName) => {
+      const aNeto = ag.sumaPos + ag.sumaNeg;
+      let aAvg;
+      if (zeroMode === 'sin') {
+        const aSin = ag.lineas - ag.cero;
+        aAvg = aSin > 0 ? aNeto / aSin : 0;
+      } else {
+        aAvg = ag.lineas > 0 ? aNeto / ag.lineas : 0;
+      }
+      areas.push({ area: areaName, avg: aAvg });
+    });
+    areas.sort((a, b) => b.avg - a.avg);
+
+    // Compute sector averages (for expand row)
+    const sectors = [];
+    g.sectorMap.forEach((sg, sectorName) => {
+      const sNeto = sg.sumaPos + sg.sumaNeg;
+      let sAvg;
+      if (zeroMode === 'sin') {
+        const sSin = sg.lineas - sg.cero;
+        sAvg = sSin > 0 ? sNeto / sSin : 0;
+      } else {
+        sAvg = sg.lineas > 0 ? sNeto / sg.lineas : 0;
+      }
+      sectors.push({ area: sectorName, avg: sAvg });
+    });
+    sectors.sort((a, b) => b.avg - a.avg);
+
+    // Compute publication averages (for tooltip, filtered to product's canal)
+    const pubs = [];
+    g.pubMap.forEach((pg, pubName) => {
+      const pNeto = pg.sumaPos + pg.sumaNeg;
+      let pAvg;
+      if (zeroMode === 'sin') {
+        const pSin = pg.lineas - pg.cero;
+        pAvg = pSin > 0 ? pNeto / pSin : 0;
+      } else {
+        pAvg = pg.lineas > 0 ? pNeto / pg.lineas : 0;
+      }
+      pubs.push({ pub: pubName, avg: pAvg });
+    });
+    pubs.sort((a, b) => b.avg - a.avg);
+
+    return { ...g, neto, avgCon, avgSin, avgPrev, areas, sectors, pubs };
+  });
+
+  if (search) items = items.filter(g => g.prod.toLowerCase().includes(search));
+
+  const avg = g => zeroMode === 'con' ? g.avgCon : g.avgSin;
+  if (sortBy === 'familia') {
+    items.sort((a, b) => {
+      const fa = a.fam || ''; const fb = b.fam || '';
+      if (fa !== fb) return fa.localeCompare(fb);
+      return avg(b) - avg(a);
+    });
+  } else if (sortBy === 'lineas') {
+    items.sort((a, b) => b.lineas - a.lineas);
+  } else if (sortBy === 'neto') {
+    items.sort((a, b) => b.neto - a.neto);
+  } else if (sortBy === 'avg') {
+    items.sort((a, b) => avg(b) - avg(a));
+  } else {
+    items.sort((a, b) => a.prod.localeCompare(b.prod));
+  }
+
+  const totalLineas = items.reduce((s, g) => s + g.lineas, 0);
+  const totalNeto   = items.reduce((s, g) => s + g.neto, 0);
+  const totalCeros  = items.reduce((s, g) => s + g.cero, 0);
+  document.getElementById('summary-bar').innerHTML = `
+    <div class="summary-card accent"><div class="s-val">${items.length}</div><div class="s-label">productos distintos</div></div>
+    <div class="summary-card purple"><div class="s-val">${fmtNum(totalLineas)}</div><div class="s-label">líneas totales</div></div>
+    <div class="summary-card green"><div class="s-val">${fmt(totalNeto)}</div><div class="s-label">ingreso neto total</div></div>
+    <div class="summary-card amber"><div class="s-val">${fmtNum(totalCeros)}</div><div class="s-label">líneas a 0 €</div></div>
+  `;
+
+  const note = document.getElementById('info-note');
+  note.classList.remove('hidden');
+  if (zeroMode === 'sin') {
+    document.getElementById('info-text').innerHTML = '<strong>Modo activo: No incluye líneas a 0 €.</strong> El presupuesto medio se calcula dividiendo el ingreso neto entre todas las líneas con valor superior a cero (exceptuando los reparos). En la tabla se muestra la columna "Líneas a 0 €" para mayor claridad.';
+  } else {
+    document.getElementById('info-text').innerHTML = '<strong>Modo activo: Incluye líneas a 0 €.</strong> El presupuesto medio se calcula dividiendo el ingreso neto entre todas las líneas (exceptuando los reparos).';
+  }
+
+  const showCeroCol = zeroMode === 'sin';
+  const showVsCol   = yr !== 'all';
+  const totalCols   = 10 + (showCeroCol ? 1 : 0) + (showVsCol ? 1 : 0);
+  const prevYrLabel = yr !== 'all' ? String(parseInt(yr, 10) - 1) : '';
+  document.getElementById('thead').innerHTML = `<tr>
+    <th>Producto</th><th>Canal</th><th>Familia</th>
+    <th class="num">Líneas<br>totales</th>
+    <th class="num" style="color:var(--green)">Líneas<br>positivas</th>
+    <th class="num" style="color:var(--coral)">Líneas<br>negativas</th>
+    ${showCeroCol ? '<th class="num" style="color:var(--amber)">Líneas<br>a 0 €</th>' : ''}
+    <th class="num">Suma<br>bruta (+)</th>
+    <th class="num">Suma<br>negativa</th>
+    <th class="num">Ingreso<br>neto</th>
+    <th class="num" style="color:var(--accent)">Precio medio${zeroMode === 'sin' ? '<br><span style="font-size:9px;font-weight:400">(sin 0 €)</span>' : '<br><span style="font-size:9px;font-weight:400">(con 0 €)</span>'}</th>
+    ${showVsCol ? `<th class="num" style="color:var(--text2)">vs ${prevYrLabel}<br><span style="font-size:9px;font-weight:400">variación</span></th>` : ''}
+  </tr>`;
+
+  const tbody = document.getElementById('tbody');
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="${totalCols}" class="empty-state">Sin datos para los filtros seleccionados</td></tr>`;
+    return;
+  }
+
+  const canalClass = { DIGITAL:'badge-D', PRINT:'badge-P', EVENTOS:'badge-E', OTROS:'badge-O' };
+  let html = '';
+  let currentFam = null;
+  const byFamilia = sortBy === 'familia';
+
+  items.forEach((g, idx) => {
+    if (byFamilia && g.fam !== currentFam) {
+      currentFam = g.fam;
+      html += `<tr class="family-header"><td colspan="${totalCols}">📁 ${g.fam || '(sin familia)'}</td></tr>`;
+    }
+    const avgVal = zeroMode === 'con' ? g.avgCon : g.avgSin;
+    const rowId = 'row-' + idx;
+
+    // Build tooltip content (by ÁREA)
+    let ttRows = '';
+    if (g.areas.length > 0) {
+      g.areas.forEach(s => {
+        const cls = s.avg > avgVal ? 'tt-above' : s.avg < avgVal ? 'tt-below' : 'tt-equal';
+        ttRows += `<div class="tt-row">
+          <span class="tt-area">${s.area}</span>
+          <span class="tt-val ${cls}">${fmt(s.avg)}</span>
+        </div>`;
+      });
+    } else {
+      ttRows = `<div class="tt-row"><span class="tt-area" style="font-style:italic">Sin datos de área</span></div>`;
+    }
+
+    // Build tooltip sector rows (right column)
+    let ttSectorRows = '';
+    if (g.sectors.length > 0) {
+      g.sectors.forEach(s => {
+        const cls = s.avg > avgVal ? 'tt-above' : s.avg < avgVal ? 'tt-below' : 'tt-equal';
+        ttSectorRows += `<div class="tt-row">
+          <span class="tt-area">${s.area}</span>
+          <span class="tt-val ${cls}">${fmt(s.avg)}</span>
+        </div>`;
+      });
+    } else {
+      ttSectorRows = `<div class="tt-row"><span class="tt-area" style="font-style:italic">Sin datos de sector</span></div>`;
+    }
+    // Build tooltip publication rows (third column)
+    let ttPubRows = '';
+    if (g.pubs.length > 0) {
+      g.pubs.forEach(p => {
+        const cls = p.avg > avgVal ? 'tt-above' : p.avg < avgVal ? 'tt-below' : 'tt-equal';
+        ttPubRows += `<div class="tt-row">
+          <span class="tt-area">${p.pub}</span>
+          <span class="tt-val ${cls}">${fmt(p.avg)}</span>
+        </div>`;
+      });
+    } else {
+      ttPubRows = `<div class="tt-row"><span class="tt-area" style="font-style:italic">Sin datos de publicación</span></div>`;
+    }
+    let vsHtml = '';
+    if (showVsCol) {
+      if (g.avgPrev === null) {
+        vsHtml = `<td class="vs-col"><span class="vs-na">Sin datos ${prevYrLabel}</span></td>`;
+      } else if (g.avgPrev === 0) {
+        vsHtml = `<td class="vs-col"><span class="vs-na">Precio prev. 0 €</span></td>`;
+      } else {
+        const diff = avgVal - g.avgPrev;
+        const pct  = (diff / Math.abs(g.avgPrev)) * 100;
+        const sign  = diff >= 0 ? '+' : '';
+        const cls   = diff >= 0 ? 'vs-up' : 'vs-down';
+        const arrow = diff >= 0 ? '▲' : '▼';
+        vsHtml = `<td class="vs-col">
+          <span class="${cls}">${arrow} ${sign}${pct.toFixed(1)}%</span>
+          <span class="vs-bruto ${cls}">(${sign}${fmt(diff)})</span>
+        </td>`;
+      }
+    }
+
+    // Sector expand chips HTML (by SECTOR)
+    let sectorChips = '';
+    if (g.sectors.length > 0) {
+      g.sectors.forEach(s => {
+        const cls = s.avg > avgVal ? 'sc-above' : s.avg < avgVal ? 'sc-below' : 'sc-equal';
+        sectorChips += `<span class="sector-chip">
+          <span class="sc-label">${s.area}</span>
+          <span class="sc-val ${cls}">${fmt(s.avg)}</span>
+        </span>`;
+      });
+    } else {
+      sectorChips = `<span style="font-size:11px;color:var(--text3);font-style:italic">Sin datos de sector</span>`;
+    }
+
+    html += `<tr data-rowid="${rowId}">
+      <td>
+        <button class="expand-btn" id="btn-${rowId}" onclick="toggleSector('${rowId}')">▶</button>
+        <strong>${g.prod}</strong>
+        <span class="tooltip-wrap">
+          <span class="tt-trigger" id="tti-${rowId}"
+            onmouseenter="showTooltip('tti-${rowId}','tt-${rowId}')"
+            onmouseleave="hideTooltip('tt-${rowId}')"
+            onclick="toggleTooltip(event,'tti-${rowId}','tt-${rowId}')">i</span>
+          <div class="tooltip-box" id="tt-${rowId}">
+            <div class="tt-cols">
+              <div>
+                <div class="tt-title">Presupuesto medio por área</div>
+                ${ttRows}
+                <div class="tt-avg-line">Media del producto <span>${fmt(avgVal)}</span></div>
+              </div>
+              <div style="border-left:1px solid rgba(255,255,255,0.08);padding-left:16px">
+                <div class="tt-title">Presupuesto medio por sector</div>
+                ${ttSectorRows}
+                <div class="tt-avg-line">Media del producto <span>${fmt(avgVal)}</span></div>
+              </div>
+              <div style="border-left:1px solid rgba(255,255,255,0.08);padding-left:16px">
+                <div class="tt-title">Presupuesto medio por publicación</div>
+                ${ttPubRows}
+                <div class="tt-avg-line">Media del producto <span>${fmt(avgVal)}</span></div>
+              </div>
+            </div>
+          </div>
+        </span>
+      </td>
+      <td><span class="badge ${canalClass[g.canal] || 'badge-O'}">${g.canal}</span></td>
+      <td style="font-size:11px;color:var(--text3)">${g.fam}</td>
+      <td class="num">${fmtNum(g.lineas)}</td>
+      <td class="num pos">${fmtNum(g.pos)}</td>
+      <td class="num ${g.neg > 0 ? 'neg' : 'num-neutral'}">${fmtNum(g.neg)}</td>
+      ${showCeroCol ? `<td class="num ${g.cero > 0 ? '' : 'num-neutral'}" style="${g.cero > 0 ? 'color:var(--amber)' : ''}">${fmtNum(g.cero)}</td>` : ''}
+      <td class="num">${fmt(g.sumaPos)}</td>
+      <td class="num ${g.sumaNeg < 0 ? 'neg' : 'num-neutral'}">${g.sumaNeg !== 0 ? fmt(g.sumaNeg) : '—'}</td>
+      <td class="num"><strong>${fmt(g.neto)}</strong></td>
+      <td class="avg-col">${fmt(avgVal)}</td>
+      ${vsHtml}
+    </tr>
+    <tr class="sector-row" id="sector-${rowId}" style="display:none">
+      <td colspan="${totalCols}">
+        <div class="sector-inner">
+          <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);font-weight:600;margin-right:4px;white-space:nowrap">Por sector →</span>
+          ${sectorChips}
+        </div>
+      </td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+
+  // Close tooltips when clicking outside
+  document.addEventListener('click', closeTipsOutside, { once: false });
+}
+
+// ─── TOOLTIP HELPERS ──────────────────────────────────────────────────────────
+let _openTooltip = null;
+
+function positionTooltip(trigger, box) {
+  const tr = trigger.getBoundingClientRect();
+  const margin = 10;
+  const spaceAbove = tr.top;
+  const spaceBelow = window.innerHeight - tr.bottom;
+
+  // Temporarily show to measure height
+  box.style.visibility = 'hidden';
+  box.style.display = 'block';
+  const bh = box.offsetHeight;
+  const bw = box.offsetWidth;
+  box.style.display = '';
+  box.style.visibility = '';
+
+  // Decide direction
+  const goBelow = spaceAbove < bh + margin + 20 && spaceBelow >= bh + margin;
+  box.classList.toggle('tt-above', !goBelow);
+  box.classList.toggle('tt-below', goBelow);
+
+  // Vertical position
+  let top;
+  if (goBelow) {
+    top = tr.bottom + 8;
+  } else {
+    top = tr.top - bh - 8;
+  }
+  top = Math.max(margin, Math.min(top, window.innerHeight - bh - margin));
+
+  // Horizontal: center on trigger, clamp to viewport
+  let left = tr.left + tr.width / 2 - bw / 2;
+  left = Math.max(margin, Math.min(left, window.innerWidth - bw - margin));
+
+  box.style.top  = top + 'px';
+  box.style.left = left + 'px';
+}
+
+function showTooltip(triggerId, boxId) {
+  if (_openTooltip && _openTooltip !== boxId) document.getElementById(_openTooltip)?.classList.remove('tt-visible');
+  const trigger = document.getElementById(triggerId);
+  const box = document.getElementById(boxId);
+  if (!trigger || !box) return;
+  positionTooltip(trigger, box);
+  box.classList.add('tt-visible');
+  _openTooltip = boxId;
+}
+function hideTooltip(id) {
+  document.getElementById(id)?.classList.remove('tt-visible');
+  if (_openTooltip === id) _openTooltip = null;
+}
+function toggleTooltip(e, triggerId, boxId) {
+  e.stopPropagation();
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  const isOpen = box.classList.contains('tt-visible');
+  if (_openTooltip && _openTooltip !== boxId) document.getElementById(_openTooltip)?.classList.remove('tt-visible');
+  if (isOpen) {
+    box.classList.remove('tt-visible');
+    _openTooltip = null;
+  } else {
+    const trigger = document.getElementById(triggerId);
+    positionTooltip(trigger, box);
+    box.classList.add('tt-visible');
+    _openTooltip = boxId;
+  }
+}
+function closeTipsOutside(e) {
+  if (_openTooltip && !e.target.closest('.tooltip-wrap')) {
+    document.getElementById(_openTooltip)?.classList.remove('tt-visible');
+    _openTooltip = null;
+  }
+}
+
+// ─── SECTOR EXPAND ────────────────────────────────────────────────────────────
+function toggleSector(rowId) {
+  const sectorRow = document.getElementById('sector-' + rowId);
+  const btn = document.getElementById('btn-' + rowId);
+  if (!sectorRow) return;
+  const isOpen = sectorRow.style.display !== 'none';
+  sectorRow.style.display = isOpen ? 'none' : '';
+  btn?.classList.toggle('open', !isOpen);
+}
+</script>
+</body>
+</html>

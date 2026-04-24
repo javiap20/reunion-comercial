@@ -1,0 +1,3292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparativa por Anunciantes</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        :root {
+            --card: #111827;
+            --text: #e5e7eb;
+            --base: #38bdf8;
+            --comp: #f59e0b;
+            --neg: #f87171;
+            --ok-green: #34d399;
+            --totalBg: #1e40af;
+            --title-summary: #d946ef;
+            --summary-bg: #111827;
+            --summary-border: #4b5563;
+            --bullet-size: 1.1rem;
+            --bullet-indent: 22px;
+  --print-color: #db2777;
+  --evento-color: #34d399;
+  --base-color: var(--base);
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', Arial, sans-serif;
+            background: linear-gradient(180deg, #020617, #0f172a);
+            color: var(--text);
+            overflow-y: scroll;
+        }
+
+        .nav-menu {
+            background: #111827;
+            padding: 15px;
+            text-align: center;
+            border-bottom: 1px solid #374151;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            height: 55px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-menu a { color: #fff; margin: 0 10px; text-decoration: none; font-size: .9em; opacity: 0.8; }
+        .nav-menu .active { opacity: 1; font-weight: bold; border-bottom: 2px solid var(--base); padding-bottom: 5px; }
+
+        h1 { text-align: center; font-size: 1.5rem; margin: 20px 0; }
+        .container { max-width: 1500px; margin: auto; padding: 20px; }
+        .card { background: rgba(17, 24, 39, .9); border-radius: 14px; padding: 18px; margin-bottom: 20px; border: 1px solid #1f2937; }
+
+        .filters select, input[type=file] {
+            background: #1f2933; color: var(--text); border: 1px solid #374151; padding: 8px 10px; border-radius: 8px; width: 100%; box-sizing: border-box;
+        }
+
+        .filtersRow { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+        .filtersRow div select { width: 220px; font-weight: 600; }
+
+        .checkboxGroup { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 5px; }
+        .checkboxGroup label { font-size: 0.85em; font-weight: 400; color: #cbd5e1; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+
+        #fAnunciante {
+            max-height: 85px; 
+            overflow-y: auto; 
+            background-color: #f1f5f9 !important; 
+            padding: 8px; 
+            border-radius: 10px; 
+            border: 2px solid var(--base); 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+            gap: 2px;
+        }
+
+        #fAnunciante::-webkit-scrollbar { width: 6px; }
+        #fAnunciante::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+        #fAnunciante label {
+            font-weight: 600; 
+            font-size: 0.82rem; 
+            display: flex; 
+            align-items: center; 
+            gap: 6px; 
+            color: #000 !important; 
+            cursor: pointer; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            transition: background 0.1s;
+        }
+
+        #fAnunciante label:hover { background: #e2e8f0; }
+        #fAnunciante input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; }
+
+        .totalBlock { background: var(--totalBg); padding: 15px; border-radius: 12px; margin-top: 10px; }
+        .totalValues { display: flex; justify-content: space-around; font-size: 18px; }
+        .totalValues .value { font-size: 22px; font-weight: 700; display: block; margin-top: 5px; }
+        #diffPercent.negative { color: var(--neg); }
+
+        .statsBlock { display: flex; justify-content: center; border-radius: 12px; margin: 20px 0; gap: 10px; flex-wrap: wrap; }
+        .subBlock { border-radius: 12px; padding: 20px; display: flex; align-items: center; justify-content: center; }
+        .statsBase { flex: 0 0 450px; background: var(--base); color: #111; }
+        .statsDiff { flex: 0 0 300px; background: #6ee7b7; color: #111; }
+        .statsComp { flex: 0 0 450px; background: var(--comp); color: #111; }
+
+        .statsValues { display: flex; justify-content: center; font-size: 16px; gap: 18px; flex-wrap: wrap; }
+        .statsValues .value { font-size: 18px; font-weight: 700; display: block; margin-top: 5px; }
+
+        .summaryCard { border: 1px dashed var(--summary-border); background: var(--summary-bg); border-radius: 12px; padding: 18px; color: #cbd5e1; }
+        .summaryGrid { display: grid; grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 18px; }
+        .summaryHeader { font-weight: 800; border: 1px solid #1f2937; border-radius: 10px; padding: 10px 12px; background: rgba(17, 24, 39, 0.6); }
+        .summarySection { background: rgba(2, 6, 23, 0.35); border: 1px solid rgba(75, 85, 99, 0.5); border-radius: 12px; padding: 12px; }
+        .summaryTitle { font-weight: 800; margin: 4px 0 10px 0; color: var(--title-summary); }
+
+        .itemList { list-style: none; padding: 0; margin: 0; }
+        .itemList li { position: relative; padding-left: var(--bullet-indent); margin: 8px 0; color: #e5e7eb; font-weight: 400; line-height: 1.35; }
+        .itemList li::before { content: "✔"; font-size: var(--bullet-size); position: absolute; left: 0; top: 0.1rem; }
+        .itemList .amount { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+        .comp-table { width: 100%; border-collapse: collapse; margin-top: 10px; color: #fff; }
+        .comp-table th { border-bottom: 2px solid var(--base); padding: 10px; text-align: left; color: var(--base); font-size: 0.9rem; }
+        .comp-table td { padding: 10px; border-bottom: 1px solid #374151; font-size: 0.9rem; }
+        .diff-up { color: #34d399; font-weight: bold; }
+        .diff-down { color: #f87171; font-weight: bold; }
+
+        .sub-adv-block { margin: 12px 0 22px 0; padding: 12px 16px; background: rgba(56, 189, 248, 0.05); border-left: 3px solid var(--base); border-radius: 8px; }
+        .sub-adv-title { font-weight: 700; color: var(--base); margin-bottom: 8px; }
+        .month-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #374151; font-size: 0.85rem; }
+        .month-row span { width: 33%; }
+        
+        .perc-val { 
+    font-size: 0.75rem; 
+    color: #94a3b8; 
+    margin-left: 4px; 
+    font-weight: normal; 
+}
+
+        #fSite { background-color: #fef3c7 !important; color: #111 !important; }
+        #fProduct { background-color: #dbeafe !important; color: #111 !important; }
+        #fSector { background-color: #fbcfe8 !important; color: #111 !important; }
+        #fComercial { background-color: #d1fae5 !important; color: #111 !important; }
+        #fArea { background-color: #fcd5ce !important; color: #111 !important; }
+
+        /* Bloque Marcas por Sector */
+        #sectorBrandsBlock { border-color: #10b981; }
+        #sectorBrandsBlock h2 { color: #10b981; }
+
+        #sectorAdvSelector {
+            background: #1f2937;
+            border: 1px solid #10b981;
+            color: var(--text);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            min-width: 280px;
+        }
+
+        .brands-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        .brands-table th {
+            border-bottom: 2px solid #10b981;
+            padding: 9px 12px;
+            text-align: left;
+            color: #10b981;
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }
+        .brands-table th.right { text-align: right; }
+        .brands-table th.center { text-align: center; }
+        .brands-table td { padding: 8px 12px; border-bottom: 1px solid #1f2937; font-size: 0.85rem; }
+        .brands-table td.right { text-align: right; font-variant-numeric: tabular-nums; }
+        .brands-table td.center { text-align: center; }
+        .brands-table tbody tr:hover { background: rgba(16,185,129,0.05); }
+
+
+
+/* Contenedor de las tablas de desglose por Site */
+#advSiteBreakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.sub-adv-block {
+    overflow-x: auto; /* Permite scroll horizontal si hay muchas columnas */
+    background: rgba(30, 41, 59, 0.5);
+    border-radius: 12px;
+    padding: 15px;
+    border: 1px solid #334155;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.85rem;
+}
+
+/* 4. Ajuste de espaciado general */
+.data-table th, .data-table td {
+    padding: 6px 10px;
+    white-space: nowrap; 
+    line-height: 1.2;
+}
+
+/* Línea blanca fina debajo de los títulos de ingreso */
+.data-table thead tr:last-child th {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.8) !important;
+    padding-bottom: 8px;
+    background: transparent;
+}
+
+/* Ajuste para que la columna de Publicación también tenga la línea */
+.data-table thead tr:last-child .sticky-col {
+    border-bottom: 1px solid #000000 !important;
+}
+
+/* Columna de 'Publicación' o 'Mes' fija */
+.sticky-col {
+    text-transform: lowercase;
+    font-size: 0.85rem;
+    font-weight: 500;
+    position: sticky;
+    left: 0;
+    background: #111827;
+    z-index: 10;
+    border-right: 2px solid #334155;
+    /* --- FORZAMOS ANCHO FIJO --- */
+    min-width: 200px; 
+    width: 200px;
+}
+
+/* Mantener la línea azul gruesa arriba para los nombres de anunciantes */
+.adv-header-group {
+    border-bottom: 2px solid var(--base) !important;
+    padding: 10px 5px !important;
+}
+
+/* Asegura que la celda de 'Publicación' también tenga la línea superior */
+.data-table thead tr:first-child .sticky-col {
+    border-bottom: 2px solid var(--base) !important;
+    text-transform: none; /* Mantiene "Publicación" con la P mayúscula */
+}
+
+/* Separador visual entre bloques de anunciantes */
+.adv-separator {
+    border-left: 2px solid #475569;
+}
+
+/* Columnas de valores (Anunciantes) */
+.val-col {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    /* --- FORZAMOS ANCHO FIJO (130px por cada columna de año) --- */
+    min-width: 130px;
+    width: 130px;
+    white-space: nowrap; 
+}
+
+.adv-header-name {
+    display: block;
+    color: var(--base);
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+
+/* Selector de tipo (Digital / Print / Eventos) */
+.type-selector-wrap {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding: 18px 20px;
+    background: #111827;
+    border-bottom: 1px solid #1f2937;
+    flex-wrap: wrap;
+}
+.type-btn {
+    padding: 10px 28px;
+    border-radius: 999px;
+    border: 2px solid #374151;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+}
+.type-btn:hover { border-color: #64748b; color: #e2e8f0; }
+.type-btn.active-digital  { border-color: #38bdf8; color: #38bdf8; background: rgba(56,189,248,0.08); }
+.type-btn.active-print    { border-color: #db2777; color: #db2777; background: rgba(219,39,119,0.08); }
+.type-btn.active-eventos  { border-color: #34d399; color: #34d399; background: rgba(52,211,153,0.08); }
+.type-btn.active-todos    { border-color: #818cf8; color: #818cf8; background: rgba(129,140,248,0.12); }
+
+
+
+/* ── MIX DE INVERSIÓN ── */
+.mix-th-group {
+    text-align: center;
+    padding: 8px 6px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    border-bottom: 2px solid #818cf8;
+    white-space: nowrap;
+}
+.mix-th-year {
+    text-align: center;
+    padding: 5px 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(255,255,255,0.25);
+    white-space: nowrap;
+    color: #94a3b8;
+}
+.mix-td-label {
+    font-weight: 700;
+    padding: 9px 10px;
+    white-space: nowrap;
+    border-bottom: 1px solid #1f2937;
+    font-size: 0.85rem;
+}
+.mix-td-val {
+    text-align: center;
+    padding: 9px 6px;
+    border-bottom: 1px solid #1f2937;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.mix-td-val .mix-amount {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    display: block;
+}
+.mix-td-val .mix-pct {
+    font-size: 1rem;
+    font-weight: 800;
+    display: block;
+}
+.mix-sep-left { border-left: 2px solid #334155; }
+.mix-total-row td { background: rgba(129,140,248,0.08); border-top: 2px solid #818cf8; font-weight: 800; }
+.prog-input-wrap { display:flex; flex-direction:column; gap:4px; }
+.prog-input-wrap label { font-size:0.75rem; color:#94a3b8; font-weight:600; }
+.prog-input-wrap input { 
+    background:#1f2937; border:1px solid #475569; color:white; 
+    padding:5px 8px; border-radius:6px; font-size:0.82rem; width:120px;
+}
+.prog-input-wrap input:focus { outline:none; border-color:#818cf8; }
+
+/* ── NAV HEARST CON MÁXIMO AIRE INFERIOR ── */
+.hn-bar {
+  background: #020617; 
+  border-bottom: 1px solid #1e293b;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  /* Aumentamos el aire: 15px arriba y 30px abajo */
+  padding: 15px 20px 30px 20px; 
+}
+
+.hn-inner {
+  max-width: 1500px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center; 
+  gap: 5px;
+}
+
+.hn-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  font-size: 0.72rem; 
+  font-weight: 600;
+  color: #94a3b8;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* ESTADO ACTIVO: COLOR CHAMPÁN */
+.hn-link.hn-active {
+  color: #fcd34d; 
+  font-weight: 800;
+}
+
+/* LÍNEA INFERIOR CORTA (ESTILO FOTO) */
+.hn-link.hn-active::after {
+  content: "";
+  position: absolute;
+  bottom: -5px; /* Un poco más de separación del texto */
+  left: 25%;    /* Más corta aún para que quede muy fina */
+  right: 25%;   
+  height: 2px;  
+  background-color: #fcd34d; 
+  border-radius: 2px;
+}
+
+.hn-sep {
+  width: 1px;
+  height: 14px;
+  background: #334155;
+  margin: 0 10px;
+  flex-shrink: 0;
+}
+
+/* AJUSTE EXTRA PARA EL TÍTULO DEL CUERPO */
+h1 {
+  margin-top: 40px !important; /* Empuja el contenido hacia abajo para que no pegue con el menú */
+}
+
+
+
+    
+        /* ── POPUP EXPORTAR ─────────────────────────────── */
+        .popup-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.75); z-index: 9000;
+            align-items: center; justify-content: center;
+        }
+        .popup-overlay.active { display: flex; }
+        .popup-box {
+            background: #111827; border: 1px solid #334155;
+            border-radius: 14px; padding: 24px;
+            max-width: 92vw; max-height: 88vh;
+            display: flex; flex-direction: column; gap: 14px;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+        }
+        .popup-header {
+            display: flex; align-items: center;
+            justify-content: space-between; gap: 16px;
+        }
+        .popup-title { font-size: 1rem; font-weight: 700; color: #e2e8f0; }
+        .popup-close {
+            background: #374151; border: none; color: #e2e8f0;
+            font-size: 1.1rem; width: 30px; height: 30px;
+            border-radius: 6px; cursor: pointer; line-height: 1;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .popup-close:hover { background: #4b5563; }
+        .popup-scroll { overflow: auto; flex: 1; }
+        .popup-table { border-collapse: collapse; font-size: 0.82rem; color: #e2e8f0; white-space: nowrap; }
+        .popup-table th { border-bottom: 2px solid #374151; padding: 7px 12px; text-align: left; font-weight: 700; }
+        .popup-table td { padding: 5px 12px; border-bottom: 1px solid #1f2937; }
+        .popup-table tr:last-child td { border-bottom: none; font-weight: 700; }
+        .expand-btn {
+            background: none; border: 1px solid currentColor;
+            color: inherit; opacity: 0.55; font-size: 0.9rem;
+            width: 24px; height: 24px; border-radius: 4px;
+            cursor: pointer; display: inline-flex;
+            align-items: center; justify-content: center;
+            margin-left: 8px; flex-shrink: 0; vertical-align: middle;
+            transition: opacity 0.15s;
+        }
+        .expand-btn:hover { opacity: 1; }
+
+
+
+
+.ai-card {
+    background: rgba(17, 24, 39, 0.7);
+    border: 1px solid rgba(52, 211, 153, 0.2);
+    border-radius: 10px;
+    padding: 15px;
+}
+.ai-card-title {
+    color: #34d399;
+    font-weight: 800;
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(52, 211, 153, 0.1);
+    padding-bottom: 5px;
+}
+.ai-insight {
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: #e5e7eb;
+}
+.ai-insight b { color: #34d399; }
+.ai-recommendation {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #374151;
+    font-style: italic;
+    font-size: 0.82rem;
+    color: #fcd34d;
+}
+
+
+        </style>
+</head>
+
+<body>
+
+
+<nav class="hn-bar" data-active="comparativa">
+  <div class="hn-inner" id="hnInner">
+    <a class="hn-link" data-id="global-reporting"  href="analisis-global.html">Global (REporting)</a>
+    <a class="hn-link" data-id="marca"             href="analisis-por-marca.html">Marca Hearst</a>
+    <a class="hn-link" data-id="anunciante"        href="analisis-por-anunciante.html">Anunciantes</a>
+    <a class="hn-link" data-id="plataforma"        href="anunciantes-desglosados-por-canales.html">Anunciantes & Plataformas</a>
+    <a class="hn-link" data-id="comparativa"       href="comparativa.html">Anunciantes (Comparativa)</a>
+    <a class="hn-link" data-id="familia-producto"  href="digital-desglose-por-producto.html">Familia & Producto</a>
+    <a class="hn-link" data-id="global-consulta"   href="dashboard.html">Global (Consulta)</a>
+    <a class="hn-link" data-id="presupuestos"      href="presupuestos-medios.html">Presupuestos Medios</a>
+    <a class="hn-link" data-id="alertas"           href="dashboard-alertas.html">Alertas</a>
+  </div>
+</nav>
+
+
+<div class="type-selector-wrap">
+    <button class="type-btn" id="btnDigital"  onclick="selectType('DIGITAL')" >DIGITAL</button>
+    <button class="type-btn" id="btnPrint"    onclick="selectType('PRINT')"   >PRINT</button>
+    <button class="type-btn" id="btnEventos"  onclick="selectType('EVENTOS')" >EVENTOS</button>
+    <button class="type-btn" id="btnTodos"    onclick="selectType('TODOS')"   >📐 TODOS LOS CANALES</button>
+</div>
+
+<h1 id="mainTitle">Comparativa eligiendo varios Anunciantes</h1>
+
+<div class="container">
+    <!-- ══ BLOQUE COMPARTIDO: carga + filtros (siempre visible tras primera carga) ══ -->
+    <div class="card">
+        <label style="font-weight: bold; margin-bottom: 8px; display: block;">Cargar datos (Excel):</label>
+        <input type="file" id="fileInput" accept=".json,.xlsx" style="display:none">
+        <div id="loadStatus" style="margin-top:4px; font-size:0.85em;">
+            <span id="loadDigital" style="margin-right:16px;">📊 Digital: <span style="color:#94a3b8;">—</span></span>
+            <span id="loadPrint"   style="margin-right:16px;">🖨️ Print: <span style="color:#94a3b8;">—</span></span>
+            <span id="loadEventos">🎪 Eventos: <span style="color:#94a3b8;">—</span></span>
+        </div>
+    </div>
+
+    <div id="filters" class="card" style="display:none">
+        <div class="filtersRow">
+            <div>
+                <label style="color:var(--base); font-weight:bold; display:block;">Año base</label>
+                <select id="fYear"></select>
+                <div class="checkboxGroup" id="monthsBase"></div>
+            </div>
+            <div>
+                <label style="color:var(--comp); font-weight:bold; display:block;">Año comparación</label>
+                <select id="fYear2"></select>
+                <div class="checkboxGroup" id="monthsComp"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="advBlock" class="card" style="display:none;">
+        <label style="font-weight: bold; display: block; margin-bottom: 8px; color: #38bdf8; font-size: 0.95rem;">
+            Selección de Anunciantes (Múltiple)
+        </label>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:8px; align-items:center;">
+            <input type="text" id="advSearch" placeholder="🔍 Buscar anunciante..." 
+                   style="flex:1; min-width:200px; padding: 8px; border-radius: 8px; border: 1px solid #38bdf8; background: #1f2937; color: white; box-sizing: border-box;"
+                   onkeyup="filterAdvList()">
+            <select id="sectorFilter" onchange="filterAdvBySector()"
+                style="flex:1; min-width:200px; padding:8px 10px; border-radius:8px; border:1px solid #f59e0b; background:#1f2937; color:#f59e0b; font-weight:600; box-sizing:border-box;">
+                <option value="">🏷️ Filtrar por sector…</option>
+            </select>
+            <button onclick="clearAdvSelection()" 
+                style="padding:8px 14px; border-radius:8px; border:1px solid #475569; background:transparent; color:#94a3b8; cursor:pointer; font-size:0.82rem; white-space:nowrap;">
+                ✕ Limpiar selección
+            </button>
+        </div>
+        <div id="fAnunciante"></div>
+        <!-- Caja de anunciantes seleccionados -->
+        <div id="selectedAdvBox" style="display:none; margin-top:12px; padding:10px 14px; background:rgba(56,189,248,0.07); border:1px solid #38bdf8; border-radius:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span style="font-size:0.82rem; font-weight:700; color:#38bdf8;">✅ Anunciantes seleccionados (<span id="selectedAdvCount">0</span>)</span>
+            </div>
+            <div id="selectedAdvTags" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+        </div>
+    </div>
+
+    <div id="siteBlock" class="card filters" style="display:none">
+        <div class="filtersRow">
+            <div><label>Site / Revista</label><select id="fSite"></select></div>
+            <div><label>Producto</label><select id="fProduct"></select></div>
+            <div><label>Sector</label><select id="fSector"></select></div>
+            <div><label>Comercial</label><select id="fComercial"></select></div>
+            <div><label>Área</label><select id="fArea"></select></div>
+        </div>
+    </div>
+
+    <!-- ══ CONTENIDO DE TABS: Digital / Print / Eventos ══ -->
+    <div id="channelContent" style="display:none">
+    <div id="advComparisonBlock" class="card" style="display:none;">
+        <h2 style="color: var(--base); font-size: 1.2rem; margin-top: 0; margin-bottom: 15px;">📊 Comparativa de Anunciantes</h2>
+        <div style="overflow-x: auto;">
+            <table id="todosCompTable" class="comp-table">
+                <thead>
+                    <tr>
+                        <th>Anunciante</th>
+                        <th style="text-align: right;">Ingreso Año Base</th>
+                        <th style="text-align: right;">Ingreso Año Comp.</th>
+                        <th style="text-align: center;">Diferencia %</th>
+                    </tr>
+                </thead>
+                <tbody id="advComparisonTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="advMonthlyBlock" class="card" style="display:none;">
+        <h2 style="color:#38bdf8; margin-top:0; font-size:1.15rem;">📅 Desglose mensual (Base vs Comparación)</h2>
+        <div id="advMonthlyBreakdown" class="grid-2-col"></div>
+    </div>
+
+    <div id="advSiteBreakdownBlock" class="card" style="display:none;">
+        <h2 style="color:#38bdf8; margin-top:0; font-size:1.15rem;">🌐 Desglose por Site (Base vs Comparación)</h2>
+        <div id="advSiteBreakdown" class="grid-2-col"></div>
+    </div>
+
+    <div id="sectorBrandsBlock" class="card" style="display:none;">
+        <h2 style="margin-top:0; font-size:1.15rem;">🏷️ Marcas por Sector</h2>
+        <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px;">
+            <label style="font-size:0.9rem; color:#94a3b8;">Anunciante:</label>
+            <select id="sectorAdvSelector" onchange="renderSectorBrands()">
+                <option value="">— elige un anunciante —</option>
+            </select>
+            <span id="sectorBrandsMeta" style="font-size:0.8rem; color:#64748b;"></span>
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="brands-table">
+                <thead>
+                    <tr>
+                        <th>Marca</th>
+                        <th class="right">Ingreso Año Base</th>
+                        <th class="right">Ingreso Año Comp.</th>
+                        <th class="right">Presupuesto Medio Base</th>
+                        <th class="right">Presupuesto Medio Comp.</th>
+                        <th class="center">Variación %</th>
+                    </tr>
+                </thead>
+                <tbody id="sectorBrandsTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="sectorBrandsGroupedBlock" class="card" style="display:none; border-color:#6366f1;">
+        <h2 style="margin-top:0; font-size:1.15rem; color:#6366f1;">🔖 Marcas agrupadas por nombre base</h2>
+        <p style="font-size:0.8rem; color:#64748b; margin:0 0 14px 0;">Se agrupan las marcas que comparten el mismo nombre antes del separador <code style="background:#1f2937; padding:1px 5px; border-radius:4px;">:</code>. Las que no tienen separador se tratan como grupo propio.</p>
+        <div style="overflow-x:auto;">
+            <table class="brands-table" style="--brands-color:#6366f1;">
+                <thead>
+                    <tr>
+                        <th style="border-bottom-color:#6366f1;">Nombre base</th>
+                        <th class="right" style="border-bottom-color:#6366f1;">Nº marcas</th>
+                        <th class="right" style="border-bottom-color:#6366f1;">Ingreso Año Base</th>
+                        <th class="right" style="border-bottom-color:#6366f1;">Ingreso Año Comp.</th>
+                        <th class="center" style="border-bottom-color:#6366f1;">Variación %</th>
+                    </tr>
+                </thead>
+                <tbody id="sectorBrandsGroupedBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    </div><!-- /channelContent -->
+
+    <!-- ══ BLOQUE PROGRAMÁTICA MANUAL (standalone, solo visible en tab TODOS) ══ -->
+    <div id="progManualCard" class="card" style="display:none; border-color:#a78bfa;">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+            <div>
+                <h3 style="margin:0; color:#a78bfa; font-size:1rem;">💡 Facturación Programática</h3>
+                <p style="margin:4px 0 0 0; font-size:0.78rem; color:#94a3b8;">Introduce el ingreso programático por anunciante (no está en el Excel). Pulsa <b style="color:#a78bfa;">Aplicar</b> cuando hayas terminado.</p>
+            </div>
+            <button id="btnApplyProg" onclick="applyProgManual()"
+                style="padding:9px 22px; border-radius:8px; border:none; background:#a78bfa; color:#0f0f1a;
+                       font-weight:800; font-size:0.88rem; cursor:pointer; white-space:nowrap;">
+                ✅ Aplicar
+            </button>
+        </div>
+        <div id="progManualBlock">
+            <div id="progManualInputs" style="display:flex; flex-wrap:wrap; gap:14px;"></div>
+        </div>
+    </div>
+
+    <!-- ══ CONTENIDO DE TAB: TODOS LOS CANALES ══ -->
+    <div id="todosContent" style="display:none">
+
+        <!-- BLOQUE 1: Comparativa -->
+        <div id="todosCompBlock" class="card" style="display:none; border-color:#38bdf8;">
+            <h2 style="margin-top:0; font-size:1.15rem; color:#38bdf8;">📊 Comparativa de Anunciantes (Todos los Canales) <button class="expand-btn" style="color:#38bdf8;" title="Ver en popup" onclick="openExportPopup('todosAllCompTable','📊 Comparativa de Anunciantes','real')">⊞</button></h2>
+            <div style="overflow-x:auto;">
+                <table id="todosAllCompTable" class="comp-table">
+                    <thead><tr>
+                        <th>Anunciante</th>
+                        <th style="text-align:right;">Ingreso Año Base</th>
+                        <th style="text-align:right;">Ingreso Año Comp.</th>
+                        <th style="text-align:center;">Diferencia %</th>
+                    </tr></thead>
+                    <tbody id="todosCompTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+
+
+
+
+
+        <!-- BLOQUE 2: Mix de Inversión -->
+        <div id="mixInversionBlock" class="card" style="border-color:#818cf8;">
+            <h2 style="margin-top:0; font-size:1.15rem; color:#818cf8;">📐 Mix de Inversión (Digital · Programática · Print · Eventos) <button class="expand-btn" style="color:#818cf8;" title="Ver en popup" onclick="openExportPopup('mixTable','📐 Mix de Inversión','pct')">⊞</button></h2>
+            <p id="mixLoadStatusMsg" style="font-size:0.8rem; color:#94a3b8; margin:0 0 14px 0;">⏳ Cargando datos Mix…</p>
+            <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:18px;">
+                <label style="font-size:0.9rem; color:#94a3b8;">Anunciante a excluir/aislar:</label>
+                <select id="mixExcludeAdv" onchange="renderMixInversion()"
+                    style="background:#1f2937; border:1px solid #818cf8; color:var(--text); padding:8px 12px; border-radius:8px; font-size:0.9rem; font-weight:600; min-width:280px;">
+                    <option value="">— elige uno —</option>
+                </select>
+            </div>
+            <div style="overflow-x:auto;">
+                <table id="mixTable" style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                    <thead id="mixTableHead"></thead>
+                    <tbody id="mixTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- BLOQUE 3: Mix por Meses -->
+        <div id="todosMesesBlock" class="card" style="display:none; border-color:#f59e0b;">
+            <h2 style="margin-top:0; font-size:1.15rem; color:#f59e0b;">📅 Mix de Inversión por Meses <button class="expand-btn" style="color:#f59e0b;" title="Ver en popup" onclick="openExportPopup('mixMesesTable','📅 Mix por Meses','pct')">⊞</button></h2>
+            <div style="overflow-x:auto;">
+                <table id="mixMesesTable" style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                    <thead id="mixMesesHead"></thead>
+                    <tbody id="mixMesesBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- BLOQUE 4: Mix por Estaciones -->
+        <div id="todosTempBlock" class="card" style="display:none; border-color:#c084fc;">
+            <h2 style="margin-top:0; font-size:1.15rem; color:#c084fc;">🌸 Mix de Inversión por Estaciones <button class="expand-btn" style="color:#c084fc;" title="Ver en popup" onclick="openExportPopup('mixTempTable','🌸 Mix por Estaciones','pct')">⊞</button></h2>
+            <div style="overflow-x:auto;">
+                <table id="mixTempTable" style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                    <thead id="mixTempHead"></thead>
+                    <tbody id="mixTempBody"></tbody>
+                </table>
+            </div>
+            <p style="font-size:0.75rem; color:#64748b; margin:10px 0 0 0;">
+                🌱 <b>Primavera:</b> Abril · Mayo · Junio &nbsp;|&nbsp;
+                ☀️ <b>Verano:</b> Julio · Agosto · Septiembre &nbsp;|&nbsp;
+                🍂 <b>Otoño:</b> Octubre · Noviembre · Diciembre &nbsp;|&nbsp;
+                ❄️ <b>Invierno:</b> Enero · Febrero · Marzo
+            </p>
+        </div>
+
+        <!-- BLOQUE 5: Mix por Publicación -->
+        <div id="todosSitesBlock" class="card" style="display:none; border-color:#34d399;">
+            <h2 style="margin-top:0; font-size:1.15rem; color:#34d399;">🌐 Mix de Inversión por Publicación <button class="expand-btn" style="color:#34d399;" title="Ver en popup" onclick="openExportPopup('mixSitesTable','🌐 Mix por Publicación','pct')">⊞</button></h2>
+            <div style="overflow-x:auto;">
+                <table id="mixSitesTable" style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                    <thead id="mixSitesHead"></thead>
+                    <tbody id="mixSitesBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- BLOQUE 6: Mix por Familia -->
+        <div id="todosFamiliasBlock" class="card" style="display:none; border-color:#fb923c;">
+            <h2 style="margin-top:0; font-size:1.15rem; color:#fb923c;">🏷️ Mix de Inversión por Familia <button class="expand-btn" style="color:#fb923c;" title="Ver en popup" onclick="openExportPopup('mixFamiliasTable','🏷️ Mix por Familia','pct')">⊞</button></h2>
+            <div style="overflow-x:auto;">
+                <table id="mixFamiliasTable" style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                    <thead id="mixFamiliasHead"></thead>
+                    <tbody id="mixFamiliasBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- BLOQUE 7: Mix por Producto -->
+        <div id="todosProductosBlock" class="card" style="display:none; border-color:#a78bfa;">
+            <h2 style="margin-top:0; font-size:1.15rem; color:#a78bfa;">🛍️ Mix de Inversión por Producto <button class="expand-btn" style="color:#a78bfa;" title="Ver en popup" onclick="openExportPopup('mixProductosTable','🛍️ Mix por Producto','pct')">⊞</button></h2>
+            <div style="overflow-x:auto;">
+                <table id="mixProductosTable" style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                    <thead id="mixProductosHead"></thead>
+                    <tbody id="mixProductosBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- BLOQUE 8: Análisis IA -->
+        <div id="aiAnalysisBlock" class="card" style="border-color:#34d399; background:rgba(52,211,153,0.04); display:none;">
+            <h2 style="margin-top:0; font-size:1.15rem; color:#34d399; display:flex; align-items:center; gap:10px;">
+                ✨ Análisis Estratégico
+                <span style="font-size:0.7rem; font-weight:600; background:#34d399; color:#020617; padding:2px 9px; border-radius:4px; text-transform:uppercase; letter-spacing:0.05em;">IA</span>
+                <button class="expand-btn" style="color:#34d399;" title="Ver en popup" onclick="openAIAnalysisPopup()">⊞</button>
+            </h2>
+            <p style="margin:0 0 16px 0; font-size:0.8rem; color:#64748b;">Análisis automático basado en los datos del anunciante seleccionado vs la competencia.</p>
+            <div id="aiAnalysisContent" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:16px;"></div>
+        </div>
+
+        <!-- BLOQUE 9: Análisis IA de Productos -->
+        <div id="aiProductosBlock" class="card" style="border-color:#a78bfa; background:rgba(167,139,250,0.03); display:none;">
+            <h2 style="margin-top:0; font-size:1.15rem; color:#a78bfa; display:flex; align-items:center; gap:10px;">
+                🛍️ Análisis de Producto
+                <span style="font-size:0.7rem; font-weight:600; background:#a78bfa; color:#020617; padding:2px 9px; border-radius:4px; text-transform:uppercase; letter-spacing:0.05em;">IA</span>
+                <button class="expand-btn" style="color:#a78bfa;" title="Ver en popup" onclick="openAIProductosPopup()">⊞</button>
+            </h2>
+            <p style="margin:0 0 16px 0; font-size:0.8rem; color:#64748b;">Top 10 productos donde el anunciante seleccionado se diferencia más de la competencia — en ambas direcciones.</p>
+            <div id="aiProductosContent" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(420px, 1fr)); gap:20px;"></div>
+        </div>
+
+        <!-- BLOQUE 10: Análisis IA por Competidor -->
+        <div id="aiCompetidoresBlock" class="card" style="border-color:#fb923c; background:rgba(251,146,60,0.03); display:none;">
+            <h2 style="margin-top:0; font-size:1.15rem; color:#fb923c; display:flex; align-items:center; gap:10px;">
+                🔍 Ventajas por Competidor
+                <span style="font-size:0.7rem; font-weight:600; background:#fb923c; color:#020617; padding:2px 9px; border-radius:4px; text-transform:uppercase; letter-spacing:0.05em;">IA</span>
+                <button class="expand-btn" style="color:#fb923c;" title="Ver en popup" onclick="openAICompetidoresPopup()">⊞</button>
+            </h2>
+            <p style="margin:0 0 16px 0; font-size:0.8rem; color:#64748b;">Top 5 productos donde cada competidor supera al anunciante excluido con una diferencia significativa.</p>
+            <div id="aiCompetidoresContent" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:16px;"></div>
+        </div>
+
+    </div><!-- /todosContent -->
+
+</div>
+
+<script>
+let excelUrl = "";
+let currentType = "";
+let rawData = [];
+// Datos cacheados por tipo para no recargar al cambiar tab
+let rawDataCache = { DIGITAL: null, PRINT: null, EVENTOS: null };
+// Datos independientes para el Mix de Inversión (cargados en paralelo desde los 3 Excel)
+let rawDataMix = { DIGITAL: [], PRINT: [], EVENTOS: [] };
+let mixLoadStatus = { DIGITAL: false, PRINT: false, EVENTOS: false };
+const MONTHS = ["01 Enero","02 Febrero","03 Marzo","04 Abril","05 Mayo","06 Junio","07 Julio","08 Agosto","09 Septiembre","10 Octubre","11 Noviembre","12 Diciembre"];
+
+const getEl = id => document.getElementById(id);
+const toTitleCase = str => str ? str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : "";
+const cleanSector = str => str ? toTitleCase(str.replace(/^[0-9* ]+/, "")) : "";
+const num = v => {
+    if(v == null || v === "") return 0;
+    if(typeof v === 'number') return v;
+    const s = String(v).replace(/[^-0-9.,]/g, "");
+    const n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+    return isFinite(n) ? n : 0;
+};
+const currencyFormatter = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+// ── Parseo genérico de filas (igual que init pero sin tocar la UI) ──────────
+function parseRows(data) {
+    return data.map(d => ({
+        ingreso: num(d["Imp.Neto a Comisionar"]),
+        Año: String(d["Año inserción"] || "").trim(),
+        Mes: MONTHS.find(m => m.startsWith(String(d["Mes inserción"]).trim().substring(0,2))) || "",
+        Anunciante: String(d["Anunciante"] || "SIN ANUNCIANTE").trim().toUpperCase(),
+        Familia: toTitleCase(String(d["Familia"] || "").trim())
+    })).filter(d => d.Año !== "");
+}
+
+// ── Carga en paralelo los 3 Excel para el Mix ──────────────────────────────
+function loadMixData() {
+    const mixStatus = getEl('mixLoadStatusMsg');
+
+    ['DIGITAL','PRINT','EVENTOS'].forEach(tipo => {
+        fetch(`PRODUCCION%20${tipo}.xlsx`)
+            .then(r => { if (!r.ok) throw new Error(); return r.arrayBuffer(); })
+            .then(buf => {
+                const wb = XLSX.read(buf, { type: 'array' });
+                const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+                rawDataMix[tipo] = parseRows(rows);
+                // También cachear para uso en tab normal
+                rawDataCache[tipo] = parseFullRows(rows);
+                mixLoadStatus[tipo] = true;
+
+                // Actualizar estado en el badge de carga
+                updateLoadBadge(tipo, true);
+
+                const loaded = Object.values(mixLoadStatus).filter(Boolean).length;
+                if (mixStatus) {
+                    if (loaded === 3) {
+                        mixStatus.textContent = '✅ Datos Mix listos (Digital + Print + Eventos)';
+                        mixStatus.style.color = '#34d399';
+                        // Si estamos en TODOS, poblar filtros y renderizar
+                        if (currentType === 'TODOS') {
+                            populateSharedFiltersFromAllCache();
+                            renderMixInversion();
+                        }
+                    } else {
+                        mixStatus.textContent = `⏳ Cargando datos Mix… (${loaded}/3)`;
+                    }
+                }
+                // Si estamos viendo un canal individual, ampliar la lista de anunciantes
+                // con los nuevos datos sin borrar la selección actual
+                if (currentType && currentType !== 'TODOS' && getEl('fAnunciante').children.length > 0) {
+                    expandAdvList();
+                }
+                // Si estamos viendo el canal que se acaba de cargar, inicializar
+                if (currentType === tipo && rawDataCache[tipo]) {
+                    initFromCache(tipo);
+                }
+            })
+            .catch(() => {
+                updateLoadBadge(tipo, false, true);
+                if (mixStatus) {
+                    mixStatus.textContent = `⚠️ No se pudo cargar PRODUCCION ${tipo}.xlsx`;
+                    mixStatus.style.color = '#f87171';
+                }
+            });
+    });
+}
+
+function updateLoadBadge(tipo, ok, err) {
+    const ids = { DIGITAL: 'loadDigital', PRINT: 'loadPrint', EVENTOS: 'loadEventos' };
+    const el = getEl(ids[tipo]);
+    if (!el) return;
+    const span = el.querySelector('span');
+    if (span) {
+        span.style.color = err ? '#f87171' : '#34d399';
+        span.textContent = err ? '⚠️ Error' : '✅ OK';
+    }
+}
+
+// ── Ampliar la lista de anunciantes con nuevos datos sin borrar selección ──
+function expandAdvList() {
+    const container = getEl('fAnunciante');
+    const existing = new Set(Array.from(container.querySelectorAll('input')).map(i => i.value));
+    const allAvailable = [
+        ...(rawDataCache.DIGITAL  || []),
+        ...(rawDataCache.PRINT    || []),
+        ...(rawDataCache.EVENTOS  || [])
+    ];
+    const allNames = [...new Set(allAvailable.map(d => d.Anunciante))].sort((a,b) => a.localeCompare(b));
+    // Añadir solo los que no existen aún
+    allNames.forEach(name => {
+        if (!existing.has(name)) {
+            const lbl = document.createElement('label');
+            lbl.innerHTML = `<input type="checkbox" value="${name}" onchange="handleAdvChange()"> ${name}`;
+            container.appendChild(lbl);
+        }
+    });
+    // Actualizar sector filter con datos combinados
+    populateSectorFilter(allAvailable);
+}
+
+// Parseo completo para uso en tabs individuales
+function parseFullRows(data) {
+    return data.map(d => ({
+        ingreso: num(d["Imp.Neto a Comisionar"]),
+        Año: String(d["Año inserción"] || "").trim(),
+        Mes: MONTHS.find(m => m.startsWith(String(d["Mes inserción"]).trim().substring(0,2))) || "",
+        Site: String(d["Publicación"] || "").trim().toLowerCase(),
+        Product: toTitleCase(String(d["Producto"] || "").trim()),
+        Sector: cleanSector(String(d["Sector"] || "")),
+        Comercial: toTitleCase(String(d["Comercial"] || "").trim()),
+        Area: toTitleCase(String(d["ÁREAS"] || "").trim()),
+        Anunciante: String(d["Anunciante"] || "SIN ANUNCIANTE").trim().toUpperCase(),
+        Marca: toTitleCase(String(d["Marca"] || "").trim()),
+        Familia: toTitleCase(String(d["Familia"] || "").trim())
+    })).filter(d => d.Año !== "");
+}
+
+// Arrancar la carga del Mix en cuanto el DOM esté listo
+document.addEventListener('DOMContentLoaded', loadMixData);
+
+function selectType(type) {
+    // Guardar estado del tab actual antes de cambiar
+    if (currentType) saveState();
+    if (currentType === type) return;
+    currentType = type;
+
+    // Título
+    getEl('mainTitle').textContent = type === 'TODOS'
+        ? '📐 Todos los Canales — Mix de Inversión'
+        : `${type} - Comparativa eligiendo varios Anunciantes`;
+
+    // Botones activos
+    ['DIGITAL','PRINT','EVENTOS'].forEach(t => {
+        const btn = getEl('btn' + t.charAt(0) + t.slice(1).toLowerCase());
+        btn.className = 'type-btn' + (t === type ? ` active-${t.toLowerCase()}` : '');
+    });
+    const btnTodos = getEl('btnTodos');
+    btnTodos.className = 'type-btn' + (type === 'TODOS' ? ' active-todos' : '');
+
+    // Mostrar/ocultar bloques de contenido según tab
+    const isChannel = ['DIGITAL','PRINT','EVENTOS'].includes(type);
+    const isTodos   = type === 'TODOS';
+
+    getEl('channelContent').style.display = isChannel ? 'block' : 'none';
+    getEl('todosContent').style.display   = isTodos   ? 'block' : 'none';
+    // Mostrar bloque prog solo en TODOS
+    const progCard = getEl('progManualCard');
+    if (progCard) progCard.style.display = isTodos ? 'block' : 'none';
+
+    if (isTodos) {
+        // Si los datos ya están cargados, trabajar con la lista actual (ya es combinada)
+        if (Object.values(mixLoadStatus).every(Boolean)) {
+            // Si la lista de anunciantes aún no existe, poblarla
+            if (getEl('fAnunciante').children.length === 0) {
+                populateSharedFiltersFromAllCache();
+            } else {
+                // La lista ya existe y tiene los checks — solo asegurar filtros de año visibles
+                getEl('filters').style.display = 'block';
+                getEl('advBlock').style.display = 'block';
+                getEl('siteBlock').style.display = 'none';
+                // Reconectar listeners de año al renderMixInversion
+                ["fYear","fYear2"].forEach(id=>{ getEl(id).onchange = renderMixInversion; });
+                getEl("monthsBase").querySelectorAll('input').forEach(i => i.onchange = renderMixInversion);
+                getEl("monthsComp").querySelectorAll('input').forEach(i => i.onchange = renderMixInversion);
+                restoreState();
+            }
+            // Poblar programática con los anunciantes ya seleccionados
+            const selectedAdvs = Array.from(getEl('fAnunciante').querySelectorAll('input:checked')).map(i=>i.value);
+            updateMixExcludeSelector(selectedAdvs);
+            buildProgManualInputs(selectedAdvs);
+            renderMixInversion();
+        }
+        return;
+    }
+
+    // Resetear bloques de canal
+    ["advComparisonBlock","advMonthlyBlock","advSiteBreakdownBlock",
+     "sectorBrandsBlock","sectorBrandsGroupedBlock"].forEach(id => {
+        const el = getEl(id); if (el) el.style.display = 'none';
+    });
+
+    // Si ya tenemos los datos en caché, inicializar directamente
+    if (rawDataCache[type]) {
+        initFromCache(type);
+        return;
+    }
+
+    // Si no, fetchear
+    excelUrl = `PRODUCCION%20${type}.xlsx`;
+    fetch(excelUrl).then(resp => {
+        if (!resp.ok) throw new Error();
+        return resp.arrayBuffer();
+    }).then(buf => {
+        const wb = XLSX.read(buf, { type: 'array' });
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+        rawDataCache[type] = parseFullRows(rows);
+        rawDataMix[type]   = parseRows(rows);
+        mixLoadStatus[type] = true;
+        updateLoadBadge(type, true);
+        initFromCache(type);
+    }).catch(() => {
+        updateLoadBadge(type, false, true);
+    });
+}
+
+// ── Estado global persistente (se mantiene al cambiar de tab) ──────────────
+let sharedState = {
+    selectedAdvs: new Set(),   // anunciantes marcados
+    year1: null,
+    year2: null,
+    monthsBase: new Set(),
+    monthsComp: new Set(),
+    site: 'Todos', product: 'Todos', sector: 'Todos', comercial: 'Todos', area: 'Todos',
+    advTextSearch: '',
+    sectorFilter: ''
+};
+
+function saveState() {
+    sharedState.selectedAdvs = new Set(
+        Array.from(getEl('fAnunciante').querySelectorAll('input:checked')).map(i => i.value)
+    );
+    sharedState.year1 = getEl('fYear').value;
+    sharedState.year2 = getEl('fYear2').value;
+    sharedState.monthsBase = new Set(
+        Array.from(getEl('monthsBase').querySelectorAll('input:checked')).map(i => i.value)
+    );
+    sharedState.monthsComp = new Set(
+        Array.from(getEl('monthsComp').querySelectorAll('input:checked')).map(i => i.value)
+    );
+    const fSite = getEl('fSite'); if(fSite) sharedState.site = fSite.value;
+    const fProd = getEl('fProduct'); if(fProd) sharedState.product = fProd.value;
+    const fSec  = getEl('fSector'); if(fSec) sharedState.sector = fSec.value;
+    const fCom  = getEl('fComercial'); if(fCom) sharedState.comercial = fCom.value;
+    const fArea = getEl('fArea'); if(fArea) sharedState.area = fArea.value;
+    const advSrch = getEl('advSearch'); if(advSrch) sharedState.advTextSearch = advSrch.value;
+    const secFlt  = getEl('sectorFilter'); if(secFlt) sharedState.sectorFilter = secFlt.value;
+}
+
+function restoreState() {
+    // Año y meses
+    const fYear = getEl('fYear');
+    if (sharedState.year1 && fYear) {
+        const opt = Array.from(fYear.options).find(o => o.value === sharedState.year1);
+        if (opt) fYear.value = sharedState.year1;
+    }
+    const fYear2 = getEl('fYear2');
+    if (sharedState.year2 && fYear2) {
+        const opt = Array.from(fYear2.options).find(o => o.value === sharedState.year2);
+        if (opt) fYear2.value = sharedState.year2;
+    }
+    getEl('monthsBase').querySelectorAll('input').forEach(i => {
+        i.checked = sharedState.monthsBase.has(i.value);
+    });
+    getEl('monthsComp').querySelectorAll('input').forEach(i => {
+        i.checked = sharedState.monthsComp.has(i.value);
+    });
+    // Filtros de site/sector etc.
+    const fSite = getEl('fSite'); if(fSite) fSite.value = sharedState.site;
+    const fProd = getEl('fProduct'); if(fProd) fProd.value = sharedState.product;
+    const fSec  = getEl('fSector'); if(fSec) fSec.value = sharedState.sector;
+    const fCom  = getEl('fComercial'); if(fCom) fCom.value = sharedState.comercial;
+    const fArea = getEl('fArea'); if(fArea) fArea.value = sharedState.area;
+    // Búsqueda de texto en anunciantes
+    const advSrch = getEl('advSearch');
+    if (advSrch) advSrch.value = sharedState.advTextSearch;
+    // Sector filter selector
+    const secFlt = getEl('sectorFilter');
+    if (secFlt && sharedState.sectorFilter) {
+        const opt = Array.from(secFlt.options).find(o => o.value === sharedState.sectorFilter);
+        if (opt) secFlt.value = sharedState.sectorFilter;
+    }
+    // Anunciantes marcados — restaurar checks y estilos
+    getEl('fAnunciante').querySelectorAll('label').forEach(lbl => {
+        const inp = lbl.querySelector('input');
+        const checked = sharedState.selectedAdvs.has(inp.value);
+        inp.checked = checked;
+        lbl.style.background = checked ? "#bae6fd" : "transparent";
+        lbl.style.color = checked ? "#0369a1" : "#000";
+    });
+    // Reordenar: marcados primero
+    const container = getEl('fAnunciante');
+    const labels = Array.from(container.querySelectorAll('label'));
+    labels.sort((a, b) => {
+        const ac = a.querySelector('input').checked;
+        const bc = b.querySelector('input').checked;
+        if (ac && !bc) return -1;
+        if (!ac && bc) return 1;
+        return a.textContent.trim().localeCompare(b.textContent.trim());
+    });
+    labels.forEach(lbl => container.appendChild(lbl));
+    // Aplicar filtro de texto si había uno
+    if (sharedState.advTextSearch) filterAdvList();
+    // Aplicar filtro de sector si había uno
+    if (sharedState.sectorFilter) filterAdvBySector();
+    // Actualizar caja de seleccionados
+    updateSelectedBox();
+}
+
+// ── Poblar selector de sectores en el bloque de anunciantes ──────────────
+function populateSectorFilter(data) {
+    const sectors = [...new Set(data.map(d => d.Sector).filter(Boolean))].sort();
+    const sel = getEl('sectorFilter');
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">🏷️ Filtrar por sector…</option>' +
+        sectors.map(s => `<option value="${s}"${s===prev?' selected':''}>${s}</option>`).join('');
+}
+
+// ── Filtrar lista de anunciantes por sector seleccionado ──────────────────
+function filterAdvBySector() {
+    const sector = getEl('sectorFilter').value;
+    const y1     = getEl('fYear').value;
+    const y2     = getEl('fYear2').value;
+    sharedState.sectorFilter = sector;
+
+    // Limpiar búsqueda de texto al usar filtro de sector
+    getEl('advSearch').value = '';
+    sharedState.advTextSearch = '';
+
+    if (!sector) {
+        // Sin filtro: mostrar todos
+        getEl('fAnunciante').querySelectorAll('label').forEach(l => l.style.display = 'flex');
+        return;
+    }
+
+    // Datos del canal activo (o combinados si es TODOS)
+    const data = currentType === 'TODOS'
+        ? [...(rawDataCache.DIGITAL||[]), ...(rawDataCache.PRINT||[]), ...(rawDataCache.EVENTOS||[])]
+        : (rawDataCache[currentType] || []);
+
+    // Anunciantes de ese sector con ingreso en año base o comparación
+    const filtered = data.filter(d =>
+        d.Sector === sector &&
+        (y1 === 'Todos' || d.Año === y1 || (y2 !== 'Sin comparar' && d.Año === y2))
+    );
+
+    // Calcular ingreso por anunciante (año base) para ordenar
+    const ingresoMap = {};
+    filtered.forEach(d => {
+        if (!ingresoMap[d.Anunciante]) ingresoMap[d.Anunciante] = 0;
+        if (y1 === 'Todos' || d.Año === y1) ingresoMap[d.Anunciante] += d.ingreso;
+    });
+
+    const advsInSector = new Set(filtered.map(d => d.Anunciante));
+
+    // Mostrar/ocultar labels y reordenar por ingreso desc
+    const container = getEl('fAnunciante');
+    const labels = Array.from(container.querySelectorAll('label'));
+
+    // Separar en: marcados del sector, no marcados del sector, resto (ocultos)
+    const inSectorChecked   = labels.filter(l => advsInSector.has(l.querySelector('input').value) && l.querySelector('input').checked);
+    const inSectorUnchecked = labels.filter(l => advsInSector.has(l.querySelector('input').value) && !l.querySelector('input').checked);
+    const outOfSector       = labels.filter(l => !advsInSector.has(l.querySelector('input').value));
+
+    // Ordenar no-marcados por ingreso desc
+    inSectorUnchecked.sort((a, b) =>
+        (ingresoMap[b.querySelector('input').value] || 0) - (ingresoMap[a.querySelector('input').value] || 0)
+    );
+
+    // Reordenar en el DOM
+    [...inSectorChecked, ...inSectorUnchecked, ...outOfSector].forEach(lbl => container.appendChild(lbl));
+
+    // Visibilidad
+    labels.forEach(lbl => {
+        lbl.style.display = advsInSector.has(lbl.querySelector('input').value) ? 'flex' : 'none';
+    });
+}
+
+function clearAdvSelection() {
+    getEl('fAnunciante').querySelectorAll('input[type=checkbox]').forEach(i => {
+        i.checked = false;
+        const lbl = i.closest('label');
+        if (lbl) { lbl.style.background = 'transparent'; lbl.style.color = '#000'; }
+    });
+    sharedState.selectedAdvs = new Set();
+    updateSelectedBox();
+    if (currentType === 'TODOS') {
+        updateMixExcludeSelector([]);
+        buildProgManualInputs([]);
+        renderMixInversion();
+    } else {
+        render();
+    }
+}
+
+// ── initFromCache con restauración de estado ──────────────────────────────
+function initFromCache(type) {
+    rawData = rawDataCache[type];
+
+    const populate = (id, arr) => {
+        getEl(id).innerHTML = "<option>Todos</option>" + [...new Set(arr.filter(Boolean))].sort().map(v=>`<option>${v}</option>`).join("");
+    };
+
+    // Lista de anunciantes SIEMPRE combinada de los 3 caches disponibles
+    // así ningún anunciante desaparece al cambiar de canal
+    const allAvailable = [
+        ...(rawDataCache.DIGITAL  || []),
+        ...(rawDataCache.PRINT    || []),
+        ...(rawDataCache.EVENTOS  || [])
+    ];
+    const advNames = [...new Set(allAvailable.map(d => d.Anunciante))].sort((a,b) => a.localeCompare(b));
+    getEl('fAnunciante').innerHTML = advNames.map(v =>
+        `<label><input type="checkbox" value="${v}" onchange="handleAdvChange()"> ${v}</label>`).join("");
+
+    // Filtros de site/producto/etc sí son solo del canal activo
+    populate("fSite",      rawData.map(d=>d.Site));
+    populate("fProduct",   rawData.map(d=>d.Product));
+    populate("fSector",    rawData.map(d=>d.Sector));
+    populate("fComercial", rawData.map(d=>d.Comercial));
+    populate("fArea",      rawData.map(d=>d.Area));
+
+    // Selector de sector en advBlock usa datos combinados
+    populateSectorFilter(allAvailable);
+
+    // Años: unión de los 3 caches para no perder años al cambiar canal
+    const allYears = [...new Set(allAvailable.map(d=>d.Año))].sort().reverse();
+    getEl('fYear').innerHTML  = "<option>Todos</option>" + allYears.map(y=>`<option>${y}</option>`).join("");
+    getEl('fYear2').innerHTML = "<option>Sin comparar</option>" + allYears.map(y=>`<option>${y}</option>`).join("");
+
+    getEl("monthsBase").innerHTML = MONTHS.map(m=>`<label><input type="checkbox" value="${m}" onchange="render()"> ${m.slice(3)}</label>`).join("");
+    getEl("monthsComp").innerHTML = MONTHS.map(m=>`<label><input type="checkbox" value="${m}" onchange="render()"> ${m.slice(3)}</label>`).join("");
+
+    ["fSite","fProduct","fSector","fYear","fYear2","fComercial","fArea"].forEach(id=>getEl(id).onchange=render);
+
+    ["filters","advBlock","siteBlock","advComparisonBlock","advSiteBreakdownBlock"].forEach(id=>getEl(id).style.display="block");
+
+    // Restaurar estado previo (checks, años, meses, filtros, búsqueda)
+    restoreState();
+    render();
+}
+
+// ── Poblar filtros compartidos combinando los 3 caches (para tab TODOS) ──
+function populateSharedFiltersFromAllCache() {
+    const allData = [...(rawDataCache.DIGITAL||[]), ...(rawDataCache.PRINT||[]), ...(rawDataCache.EVENTOS||[])];
+    if (allData.length === 0) return;
+
+    const advNames = [...new Set(allData.map(d => d.Anunciante))].sort((a,b) => a.localeCompare(b));
+    getEl('fAnunciante').innerHTML = advNames.map(v =>
+        `<label><input type="checkbox" value="${v}" onchange="handleAdvChange()"> ${v}</label>`).join("");
+
+    // Poblar selector de sector en advBlock
+    populateSectorFilter(allData);
+
+    const years = [...new Set(allData.map(d=>d.Año))].sort().reverse();
+    getEl('fYear').innerHTML = "<option>Todos</option>" + years.map(y=>`<option>${y}</option>`).join("");
+    getEl('fYear2').innerHTML = "<option>Sin comparar</option>" + years.map(y=>`<option>${y}</option>`).join("");
+
+    getEl("monthsBase").innerHTML = MONTHS.map(m=>`<label><input type="checkbox" value="${m}" onchange="renderMixInversion()"> ${m.slice(3)}</label>`).join("");
+    getEl("monthsComp").innerHTML = MONTHS.map(m=>`<label><input type="checkbox" value="${m}" onchange="renderMixInversion()"> ${m.slice(3)}</label>`).join("");
+
+    ["fYear","fYear2"].forEach(id=>{ getEl(id).onchange = renderMixInversion; });
+
+    // Ocultar filtros de site/producto/sector/comercial/area en tab TODOS (no aplican al mix)
+    getEl('siteBlock').style.display = 'none';
+
+    getEl('filters').style.display = 'block';
+    getEl('advBlock').style.display = 'block';
+
+    // Restaurar estado previo
+    restoreState();
+}
+
+function updateMixExcludeSelector(selectedAdvs) {
+    const excSel = getEl('mixExcludeAdv');
+    const prevExc = excSel.value;
+    excSel.innerHTML = '<option value="">— elige uno —</option>' +
+        selectedAdvs.map(a => `<option value="${a}"${a===prevExc?' selected':''}>${a}</option>`).join('');
+}
+
+const formatCurrency = n =>
+  new Intl.NumberFormat('es-ES', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+    useGrouping: true
+  }).format(n) + '€';
+
+
+// fileInput no se usa (carga automática), pero lo mantenemos por compatibilidad
+getEl('fileInput').onchange = e => {
+    const f = e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+        const wb = XLSX.read(new Uint8Array(ev.target.result), {type:"array"});
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+        if (currentType && currentType !== 'TODOS') {
+            rawDataCache[currentType] = parseFullRows(rows);
+            rawDataMix[currentType]   = parseRows(rows);
+            initFromCache(currentType);
+        }
+    };
+    r.readAsArrayBuffer(f);
+};
+
+function handleAdvChange() {
+    const container = getEl('fAnunciante');
+    const activeSector = getEl('sectorFilter').value;
+
+    // Actualizar estilos de checks SIN reordenar (para no romper el orden del sector)
+    container.querySelectorAll('label').forEach(lbl => {
+        const isChecked = lbl.querySelector('input').checked;
+        lbl.style.background = isChecked ? "#bae6fd" : "transparent";
+        lbl.style.color = isChecked ? "#0369a1" : "#000";
+    });
+
+    // Si hay filtro de sector activo, reordenar solo dentro de los visibles
+    // (marcados primero, luego resto del sector)
+    if (activeSector) {
+        const visible = Array.from(container.querySelectorAll('label')).filter(l => l.style.display !== 'none');
+        const checked   = visible.filter(l => l.querySelector('input').checked);
+        const unchecked = visible.filter(l => !l.querySelector('input').checked);
+        [...checked, ...unchecked].forEach(lbl => container.appendChild(lbl));
+    } else {
+        // Sin filtro: reordenar todos (marcados primero, luego alfabético)
+        const labels = Array.from(container.querySelectorAll('label'));
+        labels.sort((a, b) => {
+            const ac = a.querySelector('input').checked;
+            const bc = b.querySelector('input').checked;
+            if (ac && !bc) return -1;
+            if (!ac && bc) return 1;
+            return a.textContent.trim().localeCompare(b.textContent.trim());
+        });
+        labels.forEach(lbl => container.appendChild(lbl));
+    }
+
+    // Actualizar caja de seleccionados
+    updateSelectedBox();
+
+    // Guardar estado
+    saveState();
+
+    if (currentType === 'TODOS') {
+        const selectedAdvs = Array.from(container.querySelectorAll('input:checked')).map(i=>i.value);
+        updateMixExcludeSelector(selectedAdvs);
+        buildProgManualInputs(selectedAdvs);
+        renderMixInversion();
+    } else {
+        render();
+    }
+}
+
+// ── Caja de anunciantes seleccionados ─────────────────────────────────────
+function updateSelectedBox() {
+    const selected = Array.from(getEl('fAnunciante').querySelectorAll('input:checked')).map(i => i.value);
+    const box   = getEl('selectedAdvBox');
+    const tags  = getEl('selectedAdvTags');
+    const count = getEl('selectedAdvCount');
+
+    if (selected.length === 0) {
+        box.style.display = 'none';
+        return;
+    }
+
+    box.style.display = 'block';
+    count.textContent = selected.length;
+    tags.innerHTML = selected.map(adv => `
+        <span style="display:inline-flex; align-items:center; gap:4px; background:#1e40af; color:#bfdbfe;
+                     border-radius:6px; padding:3px 8px; font-size:0.78rem; font-weight:600; max-width:220px;">
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${adv}">${adv}</span>
+            <span onclick="removeAdv('${adv}')" 
+                  style="cursor:pointer; color:#93c5fd; font-size:0.85rem; flex-shrink:0; line-height:1;"
+                  title="Quitar">✕</span>
+        </span>`).join('');
+}
+
+function removeAdv(name) {
+    const inp = getEl('fAnunciante').querySelector(`input[value="${CSS.escape(name)}"]`);
+    if (inp) { inp.checked = false; handleAdvChange(); }
+}
+
+function filterAdvList() {
+    const q = getEl('advSearch').value.toLowerCase();
+    getEl('fAnunciante').querySelectorAll('label').forEach(l => {
+        l.style.display = l.textContent.toLowerCase().includes(q) ? "flex" : "none";
+    });
+}
+
+function calcNetting(data) {
+    const totalFact = data.reduce((acc, b) => acc + b.ingreso, 0);
+    const groups = {};
+    data.forEach(d => { if (!groups[d.Anunciante]) groups[d.Anunciante] = []; groups[d.Anunciante].push(d.ingreso); });
+    let lines = 0;
+    Object.values(groups).forEach(pool => {
+        let filtered = pool.filter(v => v !== 0).sort((a,b) => Math.abs(a) - Math.abs(b));
+        while(filtered.length > 0) {
+            let cur = filtered.shift();
+            let idx = filtered.findIndex(v => v === -cur);
+            if(idx !== -1) filtered.splice(idx,1); else if(cur > 0) lines++;
+        }
+    });
+    return { total: totalFact, lines, avg: lines ? totalFact / lines : 0 };
+}
+
+function groupSumGeneric(data, keyField) {
+    const map = new Map();
+    data.forEach(d => { const k = d[keyField] || "Desconocido"; map.set(k, (map.get(k) || 0) + d.ingreso); });
+    return Array.from(map.entries()).map(([label, sum]) => ({ label, sum })).sort((a,b) => b.sum - a.sum);
+}
+
+function render(){
+    saveState();
+    const site = getEl('fSite').value.toLowerCase(), prod = getEl('fProduct').value.toLowerCase(),
+          sec = getEl('fSector').value.toLowerCase(), y1 = getEl('fYear').value, y2 = getEl('fYear2').value,
+          com = getEl('fComercial').value.toLowerCase(), area = getEl('fArea').value.toLowerCase();
+
+    const selectedAdvs = Array.from(getEl('fAnunciante').querySelectorAll('input:checked')).map(i => i.value);
+    const m1 = Array.from(getEl("monthsBase").querySelectorAll("input:checked")).map(c=>c.value);
+    const m2 = Array.from(getEl("monthsComp").querySelectorAll("input:checked")).map(c=>c.value);
+
+    const filterFunc = (y, months) => rawData.filter(d =>
+        (y==="Todos" || d.Año===y) &&
+        (selectedAdvs.length === 0 || selectedAdvs.includes(d.Anunciante)) &&
+        (site==="todos" || d.Site===site) &&
+        (prod==="todos" || d.Product.toLowerCase()===prod) &&
+        (sec==="todos" || d.Sector.toLowerCase()===sec) &&
+        (com==="todos" || d.Comercial.toLowerCase()===com) &&
+        (area==="todos" || d.Area.toLowerCase()===area) &&
+        (months.length === 0 || months.includes(d.Mes))
+    );
+
+    const d1 = filterFunc(y1, m1);
+    const d2 = y2!=="Sin comparar" ? filterFunc(y2, m2) : [];
+
+    const advSum1 = groupSumGeneric(d1, 'Anunciante');
+    const advSum2 = groupSumGeneric(d2, 'Anunciante');
+    const compTableBody = getEl('advComparisonTableBody');
+    compTableBody.innerHTML = "";
+    
+    const listToCompare = selectedAdvs.length > 0 ? selectedAdvs : advSum1.slice(0, 12).map(i => i.label);
+
+    listToCompare.forEach(name => {
+        const s1 = advSum1.find(i => i.label === name)?.sum || 0;
+        const s2 = advSum2.find(i => i.label === name)?.sum || 0;
+        let pct = "-";
+        if(y2 !== "Sin comparar" && s2 !== 0) {
+            const val = Math.round(((s1/s2)-1)*100);
+            pct = `<span class="${val>=0?'diff-up':'diff-down'}">${val>0?'+':''}${val}%</span>`;
+        }
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><b>${name}</b></td><td align="right">${formatCurrency(s1)}</td><td align="right" style="color:var(--comp)">${y2!=="Sin comparar"?formatCurrency(s2):'-'}</td><td align="center">${pct}</td>`;
+        compTableBody.appendChild(tr);
+    });
+
+    const siteBreakdownContainer = getEl("advSiteBreakdown");
+    siteBreakdownContainer.innerHTML = ""; 
+    
+    const allSites = [...new Set([...d1, ...d2].map(r => r.Site))].filter(Boolean).sort();
+const allProducts = [...new Set([...d1, ...d2].map(r => r.Product))].filter(Boolean).sort();
+const allFamilies = [...new Set([...d1, ...d2].map(r => r.Familia))].filter(Boolean).sort();
+
+    // Lógica Marcas: Solo si hay anunciantes seleccionados y ordenadas por ellos
+    let brandsOrderedByAdv = [];
+    if (selectedAdvs.length > 0) {
+        selectedAdvs.forEach(adv => {
+            const marcasDeEsteAdv = [...new Set(
+                [...d1, ...d2].filter(r => r.Anunciante === adv).map(r => r.Marca)
+            )].filter(Boolean).sort();
+            brandsOrderedByAdv = [...brandsOrderedByAdv, ...marcasDeEsteAdv];
+        });
+    }
+
+    // Dividir en grupos de 3
+    const grupos = [];
+    for (let i = 0; i < listToCompare.length; i += 3) {
+        grupos.push(listToCompare.slice(i, i + 3));
+    }
+
+    siteBreakdownContainer.innerHTML = "";
+
+    const generarTabla = (titulo, listaFilas, campoFiltro, colorBorde, grupo) => {
+        if (listaFilas.length === 0) return "";
+        let html = `<div class="sub-adv-block" style="margin-bottom:30px; border: 2px solid ${colorBorde};">`;
+        html += `<h3 style="color:${colorBorde}; margin-left:10px;">${titulo}</h3>`;
+        html += `<table class="data-table"><thead>`;
+        html += `<tr><th class="sticky-col" style="text-transform:none;">${titulo.split(' ').pop()}</th>`;
+        grupo.forEach((adv, idx) => {
+            const sep = idx > 0 ? 'adv-separator' : '';
+            html += `<th colspan="2" class="adv-header-group ${sep}"><span class="adv-header-name" style="width: 260px; overflow: hidden; text-overflow: ellipsis; display: block; margin: auto;">${adv}</span></th>`;
+        });
+        html += `</tr><tr><th class="sticky-col"></th>`;
+        grupo.forEach((_, idx) => {
+            const sep = idx > 0 ? 'adv-separator' : '';
+            html += `<th class="val-col ${sep}" style="font-size:0.7rem; padding-bottom:10px;">Año Base</th>
+                     <th class="val-col" style="color:var(--comp); font-size:0.7rem; padding-bottom:10px;">Año Comp.</th>`;
+        });
+        html += `</tr></thead><tbody>`;
+
+        listaFilas.forEach(fila => {
+            const labelMostrar = campoFiltro === 'Mes' ? fila.slice(3) : fila.toLowerCase();
+            html += `<tr><td class="sticky-col">${labelMostrar}</td>`;
+            grupo.forEach((adv, idx) => {
+                const totalAdv1 = d1.filter(r => r.Anunciante === adv).reduce((a, b) => a + b.ingreso, 0);
+                const totalAdv2 = d2.filter(r => r.Anunciante === adv).reduce((a, b) => a + b.ingreso, 0);
+                const v1 = d1.filter(r => r.Anunciante === adv && r[campoFiltro] === fila).reduce((a, b) => a + b.ingreso, 0);
+                const v2 = d2.filter(r => r.Anunciante === adv && r[campoFiltro] === fila).reduce((a, b) => a + b.ingreso, 0);
+                const p1 = totalAdv1 > 0 ? Math.round((v1 / totalAdv1) * 100) : 0;
+                const p2 = totalAdv2 > 0 ? Math.round((v2 / totalAdv2) * 100) : 0;
+                const sep = idx > 0 ? 'adv-separator' : '';
+                html += `<td class="val-col ${sep}"><b>${v1 > 0 ? formatCurrency(v1) : '-'}</b> ${v1 > 0 ? `<small class="perc-val">(${p1}%)</small>` : ''}</td>
+                         <td class="val-col" style="color:var(--comp)">${y2 !== "Sin comparar" ? (v2 > 0 ? `<b>${formatCurrency(v2)}</b> <small class="perc-val">(${p2}%)</small>` : '-') : ''}</td>`;
+            });
+            html += `</tr>`;
+        });
+        html += `</tbody></table></div>`;
+        return html;
+    };
+
+    // Por cada sección, pintamos todos los grupos juntos
+    const secciones = [
+        { titulo: "DESGLOSE POR PUBLICACIÓN", filas: allSites,          campo: 'Site',    color: 'var(--base)' },
+        { titulo: "DESGLOSE POR MESES",        filas: MONTHS,            campo: 'Mes',     color: 'var(--comp)' },
+        { titulo: "DESGLOSE POR FAMILIA",       filas: allFamilies,       campo: 'Familia', color: '#fbbf24'     },
+        { titulo: "DESGLOSE POR PRODUCTO",      filas: allProducts,       campo: 'Product', color: '#a855f7'     },
+        { titulo: "DESGLOSE POR MARCA",         filas: brandsOrderedByAdv,campo: 'Marca',   color: '#10b981'     },
+    ];
+
+    secciones.forEach(sec => {
+        grupos.forEach((grupo, idx) => {
+            const tablaHtml = generarTabla(sec.titulo, sec.filas, sec.campo, sec.color, grupo);
+            if (!tablaHtml) return;
+            if (grupos.length > 1) {
+                siteBreakdownContainer.innerHTML += `<p style="color:#94a3b8; font-size:0.8em; margin: 20px 0 4px 4px;">Grupo ${idx + 1} de ${grupos.length}</p>`;
+            }
+            siteBreakdownContainer.innerHTML += tablaHtml;
+        });
+    });
+
+    // ── MIX DE INVERSIÓN eliminado de aquí — está solo en tab TODOS LOS CANALES ──
+
+    // Bloque Marcas por Sector
+    const sectorBrandsBlock = getEl('sectorBrandsBlock');
+    const secVal = getEl('fSector').value;
+    if (secVal !== "Todos") {
+        // Poblar selector de anunciantes presentes en el sector filtrado
+        const advsInSector = [...new Set([...d1, ...d2].map(r => r.Anunciante))].filter(Boolean).sort((a, b) => {
+            const s1a = d1.filter(r => r.Anunciante === a).reduce((s,r) => s + r.ingreso, 0);
+            const s1b = d1.filter(r => r.Anunciante === b).reduce((s,r) => s + r.ingreso, 0);
+            const s2a = d2.filter(r => r.Anunciante === a).reduce((s,r) => s + r.ingreso, 0);
+            const s2b = d2.filter(r => r.Anunciante === b).reduce((s,r) => s + r.ingreso, 0);
+            return (s1b || s2b) - (s1a || s2a);
+        });
+        const sel = getEl('sectorAdvSelector');
+        const currentAdv = sel.value;
+        sel.innerHTML = '<option value="">— elige un anunciante —</option>' +
+            advsInSector.map(a => `<option value="${a}"${a === currentAdv ? ' selected' : ''}>${a}</option>`).join('');
+        sectorBrandsBlock.style.display = 'block';
+        renderSectorBrands();
+    } else {
+        sectorBrandsBlock.style.display = 'none';
+        getEl('sectorBrandsTableBody').innerHTML = '';
+        getEl('sectorBrandsMeta').textContent = '';
+        getEl('sectorBrandsGroupedBlock').style.display = 'none';
+    }
+
+}
+
+function renderSectorBrands() {
+    const adv = getEl('sectorAdvSelector').value;
+    const tbody = getEl('sectorBrandsTableBody');
+    const meta = getEl('sectorBrandsMeta');
+    const y2 = getEl('fYear2').value;
+
+    tbody.innerHTML = '';
+    if (!adv) { meta.textContent = ''; getEl('sectorBrandsGroupedBlock').style.display = 'none'; return; }
+
+    // Reutilizamos los datos ya filtrados recalculando desde rawData con los filtros activos
+    const site = getEl('fSite').value.toLowerCase(), prod = getEl('fProduct').value.toLowerCase(),
+          sec  = getEl('fSector').value.toLowerCase(), y1 = getEl('fYear').value,
+          com  = getEl('fComercial').value.toLowerCase(), area = getEl('fArea').value.toLowerCase();
+    const m1 = Array.from(getEl("monthsBase").querySelectorAll("input:checked")).map(c=>c.value);
+    const m2 = Array.from(getEl("monthsComp").querySelectorAll("input:checked")).map(c=>c.value);
+    const selectedAdvs = Array.from(getEl('fAnunciante').querySelectorAll('input:checked')).map(i => i.value);
+
+    const baseFilter = (y, months) => rawData.filter(d =>
+        d.Anunciante === adv &&
+        (y==="Todos" || d.Año===y) &&
+        (selectedAdvs.length === 0 || selectedAdvs.includes(d.Anunciante)) &&
+        (site==="todos" || d.Site===site) &&
+        (prod==="todos" || d.Product.toLowerCase()===prod) &&
+        (sec==="todos"  || d.Sector.toLowerCase()===sec) &&
+        (com==="todos"  || d.Comercial.toLowerCase()===com) &&
+        (area==="todos" || d.Area.toLowerCase()===area) &&
+        (months.length === 0 || months.includes(d.Mes))
+    );
+
+    const rows1 = baseFilter(y1, m1);
+    const rows2 = y2 !== "Sin comparar" ? baseFilter(y2, m2) : [];
+
+    // Agrupar por marca
+    const marcas = [...new Set([...rows1, ...rows2].map(r => r.Marca))].filter(Boolean).sort((a, b) => {
+        const ing1a = rows1.filter(r => r.Marca === a).reduce((s,r) => s + r.ingreso, 0);
+        const ing1b = rows1.filter(r => r.Marca === b).reduce((s,r) => s + r.ingreso, 0);
+        const ing2a = rows2.filter(r => r.Marca === a).reduce((s,r) => s + r.ingreso, 0);
+        const ing2b = rows2.filter(r => r.Marca === b).reduce((s,r) => s + r.ingreso, 0);
+        return (ing1b || ing2b) - (ing1a || ing2a);
+    });
+
+    if (marcas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="color:#64748b; padding:12px;">Sin datos para este anunciante con los filtros actuales.</td></tr>';
+        meta.textContent = '';
+        return;
+    }
+
+    const calcAvg = (rows) => {
+        // Presupuesto medio: ingreso total / nº de líneas positivas únicas (netting simplificado)
+        const positivas = rows.filter(r => r.ingreso > 0);
+        return positivas.length ? rows.reduce((a,b) => a + b.ingreso, 0) / positivas.length : 0;
+    };
+
+    let totalBase = 0, totalComp = 0;
+
+    marcas.forEach(marca => {
+        const mr1 = rows1.filter(r => r.Marca === marca);
+        const mr2 = rows2.filter(r => r.Marca === marca);
+        const ing1 = mr1.reduce((a,b) => a + b.ingreso, 0);
+        const ing2 = mr2.reduce((a,b) => a + b.ingreso, 0);
+        const avg1 = calcAvg(mr1);
+        const avg2 = calcAvg(mr2);
+        totalBase += ing1;
+        totalComp += ing2;
+
+        let pctHtml = '-';
+        if (y2 !== "Sin comparar" && ing2 !== 0) {
+            const pct = Math.round(((ing1 / ing2) - 1) * 100);
+            pctHtml = `<span class="${pct >= 0 ? 'diff-up' : 'diff-down'}">${pct > 0 ? '+' : ''}${pct}%</span>`;
+        }
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><b>${marca}</b></td>
+            <td class="right">${ing1 > 0 ? formatCurrency(ing1) : '-'}</td>
+            <td class="right" style="color:var(--comp)">${y2 !== "Sin comparar" ? (ing2 > 0 ? formatCurrency(ing2) : '-') : ''}</td>
+            <td class="right" style="color:#94a3b8">${avg1 > 0 ? formatCurrency(Math.round(avg1)) : '-'}</td>
+            <td class="right" style="color:#d97706">${y2 !== "Sin comparar" ? (avg2 > 0 ? formatCurrency(Math.round(avg2)) : '-') : ''}</td>
+            <td class="center">${pctHtml}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // Fila de total
+    let totalPctHtml = '-';
+    if (y2 !== "Sin comparar" && totalComp !== 0) {
+        const pct = Math.round(((totalBase / totalComp) - 1) * 100);
+        totalPctHtml = `<span class="${pct >= 0 ? 'diff-up' : 'diff-down'}">${pct > 0 ? '+' : ''}${pct}%</span>`;
+    }
+    const tfr = document.createElement('tr');
+    tfr.style.borderTop = '2px solid #10b981';
+    tfr.innerHTML = `
+        <td style="font-weight:800; color:#10b981;">TOTAL</td>
+        <td class="right" style="font-weight:800;">${formatCurrency(totalBase)}</td>
+        <td class="right" style="font-weight:800; color:var(--comp)">${y2 !== "Sin comparar" ? formatCurrency(totalComp) : ''}</td>
+        <td class="right"></td><td class="right"></td>
+        <td class="center">${totalPctHtml}</td>
+    `;
+    tbody.appendChild(tfr);
+
+    meta.textContent = `${marcas.length} marca${marcas.length !== 1 ? 's' : ''}`;
+
+    // Bloque agrupado
+    renderSectorBrandsGrouped(rows1, rows2, y2);
+}
+
+function extractBrandBase(nombre) {
+    // Si tiene ":" tomar lo que va antes, limpio
+    if (nombre.includes(':')) return nombre.split(':')[0].trim();
+    // Si no, devolver tal cual (es ya un nombre base)
+    return nombre.trim();
+}
+
+function renderSectorBrandsGrouped(rows1, rows2, y2) {
+    const tbody = getEl('sectorBrandsGroupedBody');
+    const block = getEl('sectorBrandsGroupedBlock');
+    tbody.innerHTML = '';
+
+    const allMarcas = [...new Set([...rows1, ...rows2].map(r => r.Marca))].filter(Boolean);
+
+    // Agrupar por nombre base
+    const grupos = new Map();
+    allMarcas.forEach(marca => {
+        const base = extractBrandBase(marca);
+        if (!grupos.has(base)) grupos.set(base, []);
+        grupos.get(base).push(marca);
+    });
+
+    // Solo mostrar si hay al menos un grupo con más de 1 marca (si no, no aporta nada)
+    const tieneGrupos = [...grupos.values()].some(g => g.length > 1);
+    if (!tieneGrupos) {
+        block.style.display = 'none';
+        return;
+    }
+    block.style.display = 'block';
+
+    // Calcular totales por grupo y ordenar por ingreso base desc
+    const filas = [...grupos.entries()].map(([base, marcas]) => {
+        const ing1 = marcas.reduce((s, m) => s + rows1.filter(r => r.Marca === m).reduce((a,b) => a + b.ingreso, 0), 0);
+        const ing2 = marcas.reduce((s, m) => s + rows2.filter(r => r.Marca === m).reduce((a,b) => a + b.ingreso, 0), 0);
+        return { base, marcas, ing1, ing2 };
+    }).sort((a, b) => (b.ing1 || b.ing2) - (a.ing1 || a.ing2));
+
+    let totalBase = 0, totalComp = 0;
+
+    filas.forEach(({ base, marcas, ing1, ing2 }) => {
+        totalBase += ing1;
+        totalComp += ing2;
+
+        let pctHtml = '-';
+        if (y2 !== "Sin comparar" && ing2 !== 0) {
+            const pct = Math.round(((ing1 / ing2) - 1) * 100);
+            pctHtml = `<span class="${pct >= 0 ? 'diff-up' : 'diff-down'}">${pct > 0 ? '+' : ''}${pct}%</span>`;
+        }
+
+        const esGrupo = marcas.length > 1;
+        const tr = document.createElement('tr');
+        tr.style.opacity = esGrupo ? '1' : '0.55'; // atenuar los que son únicos
+        tr.innerHTML = `
+            <td>
+                <b style="color:${esGrupo ? '#6366f1' : 'inherit'}">${base}</b>
+                ${esGrupo ? `<small style="color:#94a3b8; font-size:0.75rem; margin-left:6px;">(${marcas.join(' · ')})</small>` : ''}
+            </td>
+            <td class="right" style="color:#94a3b8">${marcas.length}</td>
+            <td class="right">${ing1 > 0 ? formatCurrency(ing1) : '-'}</td>
+            <td class="right" style="color:var(--comp)">${y2 !== "Sin comparar" ? (ing2 > 0 ? formatCurrency(ing2) : '-') : ''}</td>
+            <td class="center">${pctHtml}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // Fila total
+    let totalPctHtml = '-';
+    if (y2 !== "Sin comparar" && totalComp !== 0) {
+        const pct = Math.round(((totalBase / totalComp) - 1) * 100);
+        totalPctHtml = `<span class="${pct >= 0 ? 'diff-up' : 'diff-down'}">${pct > 0 ? '+' : ''}${pct}%</span>`;
+    }
+    const tfr = document.createElement('tr');
+    tfr.style.borderTop = '2px solid #6366f1';
+    tfr.innerHTML = `
+        <td style="font-weight:800; color:#6366f1;">TOTAL</td>
+        <td class="right"></td>
+        <td class="right" style="font-weight:800;">${formatCurrency(totalBase)}</td>
+        <td class="right" style="font-weight:800; color:var(--comp)">${y2 !== "Sin comparar" ? formatCurrency(totalComp) : ''}</td>
+        <td class="center">${totalPctHtml}</td>
+    `;
+    tbody.appendChild(tfr);
+}
+
+
+// ── PROGRAMÁTICA MANUAL ────────────────────────────────────────────────────
+// Almacena { [adv]: { base: number, comp: number } }
+let progManual = {};
+
+function buildProgManualInputs(selectedAdvs) {
+    const container = getEl('progManualInputs');
+    const card      = getEl('progManualCard');
+    if (!container) return;
+
+    if (selectedAdvs.length === 0) {
+        if (card) card.style.display = 'none';
+        return;
+    }
+    if (card && currentType === 'TODOS') card.style.display = 'block';
+
+    // Conservar valores ya introducidos
+    const prev = {};
+    container.querySelectorAll('.prog-input-wrap').forEach(wrap => {
+        const adv = wrap.dataset.adv;
+        const inps = wrap.querySelectorAll('input');
+        prev[adv] = { base: inps[0]?.value || '', comp: inps[1]?.value || '' };
+    });
+
+    container.innerHTML = selectedAdvs.map(adv => {
+        const p = prev[adv] || progManual[adv] || { base: '', comp: '' };
+        const label = adv.length > 28 ? adv.slice(0, 26) + '…' : adv;
+        return `
+        <div class="prog-input-wrap" data-adv="${adv}">
+            <label title="${adv}">${label}</label>
+            <input type="number" placeholder="Base €"  value="${p.base}"  oninput="saveProgManual('${adv}','base',this.value)">
+            <input type="number" placeholder="Comp. €" value="${p.comp}" oninput="saveProgManual('${adv}','comp',this.value)">
+        </div>`;
+    }).join('');
+}
+
+function applyProgManual() {
+    // Leer todos los inputs y guardar en progManual
+    getEl('progManualInputs').querySelectorAll('.prog-input-wrap').forEach(wrap => {
+        const adv  = wrap.dataset.adv;
+        const inps = wrap.querySelectorAll('input');
+        if (!progManual[adv]) progManual[adv] = { base: 0, comp: 0 };
+        progManual[adv].base = parseFloat(inps[0]?.value) || 0;
+        progManual[adv].comp = parseFloat(inps[1]?.value) || 0;
+    });
+    const btn = getEl('btnApplyProg');
+    if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = '✔ Aplicado';
+        btn.style.opacity = '0.65';
+        setTimeout(() => { btn.textContent = orig; btn.style.opacity = '1'; }, 1600);
+    }
+    renderMixInversion();
+}
+
+function saveProgManual(adv, field, val) {
+    if (!progManual[adv]) progManual[adv] = { base: 0, comp: 0 };
+    progManual[adv][field] = parseFloat(val) || 0;
+}
+
+// ── RENDER MIX INVERSIÓN ───────────────────────────────────────────────────
+function renderMixInversion() {
+    // Solo ejecutar si estamos en el tab TODOS
+    if (currentType !== 'TODOS') return;
+
+    const y1  = getEl('fYear').value;
+    const y2  = getEl('fYear2').value;
+    const m1  = Array.from(getEl("monthsBase").querySelectorAll("input:checked")).map(c=>c.value);
+    const m2  = Array.from(getEl("monthsComp").querySelectorAll("input:checked")).map(c=>c.value);
+    const selectedAdvs = Array.from(getEl('fAnunciante').querySelectorAll('input:checked')).map(i=>i.value);
+    const excludeAdv   = getEl('mixExcludeAdv').value;
+
+    if (selectedAdvs.length === 0) return;
+
+    // Filtro sobre rawDataMix[tipo] para un conjunto de anunciantes
+    const filterMix = (tipo, y, months, advList) => rawDataMix[tipo].filter(d =>
+        (y === "Todos" || d.Año === y) &&
+        advList.includes(d.Anunciante) &&
+        (months.length === 0 || months.includes(d.Mes))
+    ).reduce((s, d) => s + d.ingreso, 0);
+
+    const advsWithout = selectedAdvs.filter(a => a !== excludeAdv);
+    const advsOnly    = excludeAdv ? [excludeAdv] : [];
+
+    // Programática manual: suma para un conjunto de anunciantes
+    const progSum = (advList, field) => advList.reduce((s,a) => s + (progManual[a]?.[field] || 0), 0);
+
+    const TIPOS = ['DIGITAL','PROGRAMATICA','PRINT','EVENTOS'];
+    const TIPO_LABELS = { DIGITAL:'Digital', PROGRAMATICA:'Programática', PRINT:'Print', EVENTOS:'Eventos' };
+    const TIPO_COLORS = { DIGITAL:'#38bdf8', PROGRAMATICA:'#a78bfa', PRINT:'#f472b6', EVENTOS:'#34d399' };
+
+    // Calcula el valor para un grupo, tipo y año
+    const val = (advList, tipo, y, months) => {
+        if (tipo === 'PROGRAMATICA') {
+            // Programática siempre 0 en Excel + dato manual
+            return progSum(advList, y === y1 ? 'base' : 'comp');
+        }
+        return filterMix(tipo, y, months, advList);
+    };
+
+    // Total de un grupo para un año (sumando los 4 tipos)
+    const totalGrupo = (advList, y, months) =>
+        TIPOS.reduce((s,t) => s + val(advList, t, y, months), 0);
+
+    const hasComp = y2 !== 'Sin comparar';
+    const colSpan = hasComp ? 2 : 1;
+
+    // Definición de las 3 columnas
+    const cols = [
+        { label: `Todos seleccionados (${selectedAdvs.length})`, advList: selectedAdvs, color: '#818cf8' },
+        { label: excludeAdv ? `Sin: ${excludeAdv.length>20?excludeAdv.slice(0,18)+'…':excludeAdv}` : 'Todos sin…', advList: advsWithout, color: '#f59e0b' },
+        { label: excludeAdv ? `Solo: ${excludeAdv.length>20?excludeAdv.slice(0,18)+'…':excludeAdv}` : 'Solo…', advList: advsOnly, color: '#fb7185' }
+    ];
+
+    // ── CABECERA ──
+    let headHtml = `<tr>
+        <th style="border-bottom:2px solid #818cf8; padding:8px 10px; text-align:left; color:#818cf8; font-size:0.8rem;">Tipo</th>`;
+    cols.forEach((col, i) => {
+        const sep = i > 0 ? 'border-left:2px solid #334155;' : '';
+        headHtml += `<th colspan="${colSpan}" class="mix-th-group" style="color:${col.color}; ${sep}">${col.label}</th>`;
+    });
+    headHtml += `</tr><tr><th style="border-bottom:1px solid rgba(255,255,255,0.2); padding:5px 10px;"></th>`;
+    cols.forEach((col, i) => {
+        const sep = i > 0 ? 'class="mix-sep-left"' : '';
+        headHtml += `<th ${sep} class="mix-th-year">${y1 !== 'Todos' ? y1 : 'Base'}</th>`;
+        if (hasComp) headHtml += `<th class="mix-th-year" style="color:var(--comp);">${y2}</th>`;
+    });
+    headHtml += `</tr>`;
+    getEl('mixTableHead').innerHTML = headHtml;
+
+    // ── FILAS ──
+    let bodyHtml = '';
+    TIPOS.forEach(tipo => {
+        const color = TIPO_COLORS[tipo];
+        bodyHtml += `<tr><td class="mix-td-label" style="color:${color};">${TIPO_LABELS[tipo]}</td>`;
+
+        cols.forEach((col, i) => {
+            const sep = i > 0 ? 'mix-sep-left' : '';
+            const v1 = val(col.advList, tipo, y1, m1);
+            const t1 = totalGrupo(col.advList, y1, m1);
+            const p1 = t1 > 0 ? ((v1/t1)*100).toFixed(1) : '0.0';
+            bodyHtml += `<td class="mix-td-val ${sep}">
+                <span class="mix-pct" style="color:${color};">${p1}%</span>
+                <span class="mix-amount">(${formatCurrency(v1)})</span>
+            </td>`;
+            if (hasComp) {
+                const v2 = val(col.advList, tipo, y2, m2);
+                const t2 = totalGrupo(col.advList, y2, m2);
+                const p2 = t2 > 0 ? ((v2/t2)*100).toFixed(1) : '0.0';
+                bodyHtml += `<td class="mix-td-val" style="opacity:0.85;">
+                    <span class="mix-pct" style="color:${color};">${p2}%</span>
+                    <span class="mix-amount" style="color:var(--comp);">(${formatCurrency(v2)})</span>
+                </td>`;
+            }
+        });
+        bodyHtml += `</tr>`;
+    });
+
+    // ── FILA TOTAL ──
+    bodyHtml += `<tr class="mix-total-row"><td class="mix-td-label" style="color:#818cf8;">TOTAL</td>`;
+    cols.forEach((col, i) => {
+        const sep = i > 0 ? 'mix-sep-left' : '';
+        const t1 = totalGrupo(col.advList, y1, m1);
+        bodyHtml += `<td class="mix-td-val ${sep}">
+            <span class="mix-pct" style="color:#e2e8f0;">100%</span>
+            <span class="mix-amount">(${formatCurrency(t1)})</span>
+        </td>`;
+        if (hasComp) {
+            const t2 = totalGrupo(col.advList, y2, m2);
+            bodyHtml += `<td class="mix-td-val">
+                <span class="mix-pct" style="color:#e2e8f0;">100%</span>
+                <span class="mix-amount" style="color:var(--comp);">(${formatCurrency(t2)})</span>
+            </td>`;
+        }
+    });
+    bodyHtml += `</tr>`;
+
+    getEl('mixTableBody').innerHTML = bodyHtml;
+
+    // Lanzar los bloques derivados
+    renderTodosComp(selectedAdvs, advsWithout, advsOnly, y1, y2, m1, m2, hasComp, cols);
+    renderMixRows('meses',      MONTHS, selectedAdvs, advsWithout, advsOnly, y1, y2, m1, m2, hasComp, cols);
+    renderMixEstaciones(selectedAdvs, advsWithout, advsOnly, y1, y2, m1, m2, hasComp, cols);
+    renderMixRows('sites',      null,   selectedAdvs, advsWithout, advsOnly, y1, y2, m1, m2, hasComp, cols);
+    renderMixRows('familias',   null,   selectedAdvs, advsWithout, advsOnly, y1, y2, m1, m2, hasComp, cols);
+    renderMixRows('productos',  null,   selectedAdvs, advsWithout, advsOnly, y1, y2, m1, m2, hasComp, cols);
+    // Lanzar análisis IA después de que los bloques estén pintados
+    setTimeout(updateAIAnalysis, 50);
+    setTimeout(updateAIProductos, 80);
+    setTimeout(updateAICompetidores, 110);
+}
+
+// ── COMPARATIVA ANUNCIANTES — TODOS LOS CANALES ───────────────────────────
+function renderTodosComp(selectedAdvs, advsWithout, advsOnly, y1, y2, m1, m2, hasComp, cols) {
+    const block = getEl('todosCompBlock');
+    if (selectedAdvs.length === 0) { block.style.display = 'none'; return; }
+    block.style.display = 'block';
+
+    const progSum = (advList, field) => advList.reduce((s,a) => s + (progManual[a]?.[field] || 0), 0);
+
+    // Ingreso total por anunciante: suma de los 3 canales + programática manual
+    const totalAdv = (adv, y, months, field) => {
+        const excel = ['DIGITAL','PRINT','EVENTOS'].reduce((s, tipo) =>
+            s + rawDataMix[tipo].filter(d =>
+                d.Anunciante === adv &&
+                (y === 'Todos' || d.Año === y) &&
+                (months.length === 0 || months.includes(d.Mes))
+            ).reduce((a, b) => a + b.ingreso, 0), 0);
+        return excel + (progManual[adv]?.[field] || 0);
+    };
+
+    const tbody = getEl('todosCompTableBody');
+    tbody.innerHTML = '';
+    let totalBase = 0, totalComp = 0;
+
+    selectedAdvs.forEach(adv => {
+        const v1 = totalAdv(adv, y1, m1, 'base');
+        const v2 = hasComp ? totalAdv(adv, y2, m2, 'comp') : 0;
+        totalBase += v1; totalComp += v2;
+        let pct = '-';
+        if (hasComp && v2 !== 0) {
+            const p = Math.round(((v1/v2)-1)*100);
+            pct = `<span class="${p>=0?'diff-up':'diff-down'}">${p>0?'+':''}${p}%</span>`;
+        }
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><b>${adv}</b></td>
+            <td align="right">${formatCurrency(v1)}</td>
+            <td align="right" style="color:var(--comp)">${hasComp ? formatCurrency(v2) : '-'}</td>
+            <td align="center">${pct}</td>`;
+        tbody.appendChild(tr);
+    });
+
+    // Fila total
+    let pctTot = '-';
+    if (hasComp && totalComp !== 0) {
+        const p = Math.round(((totalBase/totalComp)-1)*100);
+        pctTot = `<span class="${p>=0?'diff-up':'diff-down'}">${p>0?'+':''}${p}%</span>`;
+    }
+    const tfr = document.createElement('tr');
+    tfr.style.borderTop = '2px solid #38bdf8';
+    tfr.innerHTML = `
+        <td style="font-weight:800; color:#38bdf8;">TOTAL</td>
+        <td align="right" style="font-weight:800;">${formatCurrency(totalBase)}</td>
+        <td align="right" style="font-weight:800; color:var(--comp)">${hasComp ? formatCurrency(totalComp) : ''}</td>
+        <td align="center">${pctTot}</td>`;
+    tbody.appendChild(tfr);
+}
+
+// ── MAPA FIJO DE PAREJAS DIGITAL ↔ PRINT ─────────────────────────────────
+const SITE_PAIRS_FIXED = [
+    { digital: 'www.caranddriver.com/es/',      print: 'car & driver',       eventos: 'car & driver',       displayDigital: 'Car and Driver',  displayPrint: 'CAR & DRIVER',      displayEventos: 'CAR & DRIVER' },
+    { digital: 'www.cosmopolitan.com/es/',      print: 'cosmopolitan',       eventos: 'cosmopolitan',       displayDigital: 'Cosmopolitan',    displayPrint: 'COSMOPOLITAN',      displayEventos: 'COSMOPOLITAN' },
+    { digital: 'www.diezminutos.es',            print: 'diez minutos',       eventos: null,                 displayDigital: 'Diez Minutos',    displayPrint: 'DIEZ MINUTOS',      displayEventos: null },
+    { digital: 'www.elle.com/es/',              print: 'elle',               eventos: 'elle',               displayDigital: 'Elle',            displayPrint: 'ELLE',              displayEventos: 'ELLE' },
+    { digital: 'www.elledecor.com/es/',         print: 'elle decoration',    eventos: 'elle decoration',    displayDigital: 'Elle Decor',      displayPrint: 'ELLE DECORATION',   displayEventos: 'ELLE DECORATION' },
+    { digital: null,                            print: 'elle gourmet',       eventos: 'elle gourmet',       displayDigital: null,              displayPrint: 'ELLE GOURMET',      displayEventos: 'ELLE GOURMET' },
+    { digital: null,                            print: 'elle travel',        eventos: null,                 displayDigital: null,              displayPrint: 'ELLE TRAVEL',       displayEventos: null },
+    { digital: 'www.esquire.com/es/',           print: 'esquire',            eventos: 'esquire',            displayDigital: 'Esquire',         displayPrint: 'ESQUIRE',           displayEventos: 'ESQUIRE' },
+    { digital: 'www.fotogramas.es',             print: 'fotogramas & video', eventos: 'fotogramas & video', displayDigital: 'Fotogramas',      displayPrint: 'FOTOGRAMAS & VIDEO', displayEventos: 'FOTOGRAMAS & VIDEO' },
+    { digital: 'www.harpersbazaar.com/es',      print: 'harper´s bazaar',    eventos: 'harper´s bazaar',    displayDigital: "Harper's Bazaar", displayPrint: 'HARPER´S BAZAAR',   displayEventos: 'HARPER´S BAZAAR' },
+    { digital: 'www.menshealth.com/es',         print: 'men´s health',       eventos: 'men´s health',       displayDigital: "Men's Health",    displayPrint: 'MEN´S HEALTH',      displayEventos: 'MEN´S HEALTH' },
+    { digital: 'www.micasarevista.com',         print: null,                 eventos: null,                 displayDigital: 'Mi Casa',         displayPrint: null,                displayEventos: null },
+    { digital: 'www.nuevo-estilo.es',           print: 'nuevo estilo',       eventos: null,                 displayDigital: 'Nuevo Estilo',    displayPrint: 'NUEVO ESTILO',      displayEventos: null },
+    { digital: 'www.runnersworld.com/es/',      print: 'runner´s world',     eventos: null,                 displayDigital: "Runner's World",  displayPrint: 'RUNNER´S WORLD',    displayEventos: null },
+    { digital: 'www.womenshealthmag.com/es/',   print: null,                 eventos: 'women´s health',     displayDigital: "Women's Health",  displayPrint: null,                displayEventos: 'WOMEN´S HEALTH' },
+];
+
+// Nombre de display para un site desconocido: quitar www. y extensión
+function siteDisplayName(site) {
+    return site.replace(/^www\./, '').replace(/\.es\/?$|\.com(\/.*)?$/, '').replace(/[-_]/g, ' ').replace(/\//g, '').trim();
+}
+
+// Matching automático por similitud para los que no están en la lista fija
+function siteKey(s) {
+    return s.replace(/^www\./, '').replace(/\.es\/?|\.com(\/.*)?/, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+}
+
+// ── MIX POR FILAS (meses o sites) ────────────────────────────────────────
+function renderMixRows(mode, filas, selectedAdvs, advsWithout, advsOnly, y1, y2, m1, m2, hasComp, cols) {
+    const blockId = mode === 'meses' ? 'todosMesesBlock' : mode === 'familias' ? 'todosFamiliasBlock' : mode === 'productos' ? 'todosProductosBlock' : 'todosSitesBlock';
+    const headId  = mode === 'meses' ? 'mixMesesHead'   : mode === 'familias' ? 'mixFamiliasHead'   : mode === 'productos' ? 'mixProductosHead'   : 'mixSitesHead';
+    const bodyId  = mode === 'meses' ? 'mixMesesBody'   : mode === 'familias' ? 'mixFamiliasBody'   : mode === 'productos' ? 'mixProductosBody'   : 'mixSitesBody';
+    const color   = mode === 'meses' ? '#f59e0b'        : mode === 'familias' ? '#fb923c'           : mode === 'productos' ? '#a78bfa'            : '#34d399';
+    const block   = getEl(blockId);
+
+    if (selectedAdvs.length === 0) { block.style.display = 'none'; return; }
+    block.style.display = 'block';
+
+    // ════ MODO MESES ════
+    if (mode === 'meses') {
+        if (!filas || filas.length === 0) { block.style.display = 'none'; return; }
+
+        const valMes = (mes, advList, y, months, field) => {
+            if (months.length > 0 && !months.includes(mes)) return 0;
+            const excel = ['DIGITAL','PRINT','EVENTOS'].reduce((s, tipo) =>
+                s + rawDataMix[tipo].filter(d =>
+                    advList.includes(d.Anunciante) && (y === 'Todos' || d.Año === y) && d.Mes === mes
+                ).reduce((a,b) => a + b.ingreso, 0), 0);
+            const nMeses = months.length > 0 ? months.length : 12;
+            const prog = advList.reduce((s,a) => s + (progManual[a]?.[field] || 0), 0) / nMeses;
+            return excel + prog;
+        };
+        const totalMeses = (advList, y, months, field) =>
+            filas.reduce((s,f) => s + valMes(f, advList, y, months, field), 0);
+
+        const colSpan = hasComp ? 2 : 1;
+        let headHtml = `<tr><th style="border-bottom:2px solid ${color}; padding:8px 10px; text-align:left; color:${color}; font-size:0.8rem; min-width:80px;">Mes</th>`;
+        cols.forEach((col,i) => {
+            headHtml += `<th colspan="${colSpan}" class="mix-th-group" style="color:${col.color};${i>0?'border-left:2px solid #334155;':''}">${col.label}</th>`;
+        });
+        headHtml += `</tr><tr><th style="border-bottom:1px solid rgba(255,255,255,0.2);"></th>`;
+        cols.forEach((col,i) => {
+            headHtml += `<th ${i>0?'class="mix-sep-left"':''} class="mix-th-year">${y1!=='Todos'?y1:'Base'}</th>`;
+            if (hasComp) headHtml += `<th class="mix-th-year" style="color:var(--comp);">${y2}</th>`;
+        });
+        headHtml += `</tr>`;
+        getEl(headId).innerHTML = headHtml;
+
+        let bodyHtml = '';
+        filas.forEach(mes => {
+            bodyHtml += `<tr><td class="mix-td-label" style="color:${color}; font-size:0.8rem; min-width:80px;">${mes.slice(3)}</td>`;
+            cols.forEach((col,i) => {
+                const v1 = valMes(mes, col.advList, y1, m1, 'base');
+                const t1 = totalMeses(col.advList, y1, m1, 'base');
+                const p1 = t1>0 ? ((v1/t1)*100).toFixed(1) : '0.0';
+                bodyHtml += `<td class="mix-td-val${i>0?' mix-sep-left':''}"><span class="mix-pct" style="color:${color};">${p1}%</span><span class="mix-amount">(${formatCurrency(v1)})</span></td>`;
+                if (hasComp) {
+                    const v2 = valMes(mes, col.advList, y2, m2, 'comp');
+                    const t2 = totalMeses(col.advList, y2, m2, 'comp');
+                    const p2 = t2>0 ? ((v2/t2)*100).toFixed(1) : '0.0';
+                    bodyHtml += `<td class="mix-td-val" style="opacity:0.85;"><span class="mix-pct" style="color:${color};">${p2}%</span><span class="mix-amount" style="color:var(--comp);">(${formatCurrency(v2)})</span></td>`;
+                }
+            });
+            bodyHtml += `</tr>`;
+        });
+        bodyHtml += `<tr class="mix-total-row"><td class="mix-td-label" style="color:${color};">TOTAL</td>`;
+        cols.forEach((col,i) => {
+            const t1 = totalMeses(col.advList, y1, m1, 'base');
+            bodyHtml += `<td class="mix-td-val${i>0?' mix-sep-left':''}"><span class="mix-pct" style="color:#e2e8f0;">100%</span><span class="mix-amount">(${formatCurrency(t1)})</span></td>`;
+            if (hasComp) {
+                const t2 = totalMeses(col.advList, y2, m2, 'comp');
+                bodyHtml += `<td class="mix-td-val"><span class="mix-pct" style="color:#e2e8f0;">100%</span><span class="mix-amount" style="color:var(--comp);">(${formatCurrency(t2)})</span></td>`;
+            }
+        });
+        bodyHtml += `</tr>`;
+        getEl(bodyId).innerHTML = bodyHtml;
+        return;
+    }
+
+    // ════ MODO FAMILIAS ════
+    if (mode === 'familias') {
+        const familiasSet = new Set();
+        ['DIGITAL','PRINT','EVENTOS'].forEach(tipo => {
+            rawDataCache[tipo]?.forEach(d => {
+                if (selectedAdvs.includes(d.Anunciante) &&
+                    (y1 === 'Todos' || d.Año === y1 || (y2 !== 'Sin comparar' && d.Año === y2)) && d.Familia) {
+                    familiasSet.add(d.Familia);
+                }
+            });
+        });
+
+        if (familiasSet.size === 0) { block.style.display = 'none'; return; }
+
+        const familias = [...familiasSet].sort((a, b) => {
+            const va = ['DIGITAL','PRINT','EVENTOS'].reduce((s, tipo) =>
+                s + (rawDataCache[tipo]||[]).filter(d =>
+                    selectedAdvs.includes(d.Anunciante) && (y1==='Todos'||d.Año===y1) && d.Familia===a
+                ).reduce((acc,d) => acc+d.ingreso, 0), 0);
+            const vb = ['DIGITAL','PRINT','EVENTOS'].reduce((s, tipo) =>
+                s + (rawDataCache[tipo]||[]).filter(d =>
+                    selectedAdvs.includes(d.Anunciante) && (y1==='Todos'||d.Año===y1) && d.Familia===b
+                ).reduce((acc,d) => acc+d.ingreso, 0), 0);
+            return vb - va;
+        });
+
+        const valFam = (fam, advList, y, months) =>
+            ['DIGITAL','PRINT','EVENTOS'].reduce((s, tipo) =>
+                s + (rawDataCache[tipo]||[]).filter(d =>
+                    advList.includes(d.Anunciante) && (y==='Todos'||d.Año===y) &&
+                    (months.length===0||months.includes(d.Mes)) && d.Familia===fam
+                ).reduce((a,b) => a+b.ingreso, 0), 0);
+
+        const totalFam = (advList, y, months) =>
+            familias.reduce((s, f) => s + valFam(f, advList, y, months), 0);
+
+        const colSpan = hasComp ? 2 : 1;
+        let headHtml = `<tr><th style="border-bottom:2px solid ${color}; padding:8px 10px; text-align:left; color:${color}; font-size:0.8rem; min-width:130px;">Familia</th>`;
+        cols.forEach((col,i) => {
+            headHtml += `<th colspan="${colSpan}" class="mix-th-group" style="color:${col.color};${i>0?'border-left:2px solid #334155;':''}">${col.label}</th>`;
+        });
+        headHtml += `</tr><tr><th style="border-bottom:1px solid rgba(255,255,255,0.2);"></th>`;
+        cols.forEach((col,i) => {
+            headHtml += `<th ${i>0?'class="mix-sep-left"':''} class="mix-th-year">${y1!=='Todos'?y1:'Base'}</th>`;
+            if (hasComp) headHtml += `<th class="mix-th-year" style="color:var(--comp);">${y2}</th>`;
+        });
+        headHtml += `</tr>`;
+        getEl(headId).innerHTML = headHtml;
+
+        let bodyHtml = '';
+        familias.forEach(fam => {
+            bodyHtml += `<tr><td class="mix-td-label" style="color:${color}; font-size:0.8rem; min-width:130px;">${fam}</td>`;
+            cols.forEach((col,i) => {
+                const v1 = valFam(fam, col.advList, y1, m1);
+                const t1 = totalFam(col.advList, y1, m1);
+                const p1 = t1>0 ? ((v1/t1)*100).toFixed(1) : '0.0';
+                bodyHtml += `<td class="mix-td-val${i>0?' mix-sep-left':''}"><span class="mix-pct" style="color:${color};">${p1}%</span><span class="mix-amount">(${formatCurrency(v1)})</span></td>`;
+                if (hasComp) {
+                    const v2 = valFam(fam, col.advList, y2, m2);
+                    const t2 = totalFam(col.advList, y2, m2);
+                    const p2 = t2>0 ? ((v2/t2)*100).toFixed(1) : '0.0';
+                    bodyHtml += `<td class="mix-td-val" style="opacity:0.85;"><span class="mix-pct" style="color:${color};">${p2}%</span><span class="mix-amount" style="color:var(--comp);">(${formatCurrency(v2)})</span></td>`;
+                }
+            });
+            bodyHtml += `</tr>`;
+        });
+        bodyHtml += `<tr class="mix-total-row"><td class="mix-td-label" style="color:${color};">TOTAL</td>`;
+        cols.forEach((col,i) => {
+            const t1 = totalFam(col.advList, y1, m1);
+            bodyHtml += `<td class="mix-td-val${i>0?' mix-sep-left':''}"><span class="mix-pct" style="color:#e2e8f0;">100%</span><span class="mix-amount">(${formatCurrency(t1)})</span></td>`;
+            if (hasComp) {
+                const t2 = totalFam(col.advList, y2, m2);
+                bodyHtml += `<td class="mix-td-val"><span class="mix-pct" style="color:#e2e8f0;">100%</span><span class="mix-amount" style="color:var(--comp);">(${formatCurrency(t2)})</span></td>`;
+            }
+        });
+        bodyHtml += `</tr>`;
+        getEl(bodyId).innerHTML = bodyHtml;
+        return;
+    }
+
+    // ════ MODO PRODUCTOS (agrupado por familia) ════
+    if (mode === 'productos') {
+        // Recoger mapa familia → Set de productos
+        const famProdMap = {};
+        ['DIGITAL','PRINT','EVENTOS'].forEach(tipo => {
+            rawDataCache[tipo]?.forEach(d => {
+                if (selectedAdvs.includes(d.Anunciante) &&
+                    (y1 === 'Todos' || d.Año === y1 || (y2 !== 'Sin comparar' && d.Año === y2)) && d.Product) {
+                    const fam = d.Familia || '(Sin familia)';
+                    if (!famProdMap[fam]) famProdMap[fam] = new Set();
+                    famProdMap[fam].add(d.Product);
+                }
+            });
+        });
+
+        if (Object.keys(famProdMap).length === 0) { block.style.display = 'none'; return; }
+
+        const valProd = (prod, advList, y, months) =>
+            ['DIGITAL','PRINT','EVENTOS'].reduce((s, tipo) =>
+                s + (rawDataCache[tipo]||[]).filter(d =>
+                    advList.includes(d.Anunciante) && (y==='Todos'||d.Año===y) &&
+                    (months.length===0||months.includes(d.Mes)) && d.Product===prod
+                ).reduce((a,b) => a+b.ingreso, 0), 0);
+
+        const valFamProd = (fam, advList, y, months) =>
+            ['DIGITAL','PRINT','EVENTOS'].reduce((s, tipo) =>
+                s + (rawDataCache[tipo]||[]).filter(d =>
+                    advList.includes(d.Anunciante) && (y==='Todos'||d.Año===y) &&
+                    (months.length===0||months.includes(d.Mes)) && (d.Familia||'(Sin familia)')===fam
+                ).reduce((a,b) => a+b.ingreso, 0), 0);
+
+        // Ordenar familias por ingreso base desc
+        const familiasSorted = Object.keys(famProdMap).sort((a, b) =>
+            valFamProd(b, selectedAdvs, y1, m1) - valFamProd(a, selectedAdvs, y1, m1));
+
+        const totalGlobal = (advList, y, months) =>
+            familiasSorted.reduce((s, fam) => s + valFamProd(fam, advList, y, months), 0);
+
+        const colSpan = hasComp ? 2 : 1;
+        let headHtml = `<tr><th style="border-bottom:2px solid ${color}; padding:8px 10px; text-align:left; color:${color}; font-size:0.8rem; min-width:160px;">Familia / Producto</th>`;
+        cols.forEach((col,i) => {
+            headHtml += `<th colspan="${colSpan}" class="mix-th-group" style="color:${col.color};${i>0?'border-left:2px solid #334155;':''}">${col.label}</th>`;
+        });
+        headHtml += `</tr><tr><th style="border-bottom:1px solid rgba(255,255,255,0.2);"></th>`;
+        cols.forEach((col,i) => {
+            headHtml += `<th ${i>0?'class="mix-sep-left"':''} class="mix-th-year">${y1!=='Todos'?y1:'Base'}</th>`;
+            if (hasComp) headHtml += `<th class="mix-th-year" style="color:var(--comp);">${y2}</th>`;
+        });
+        headHtml += `</tr>`;
+        getEl(headId).innerHTML = headHtml;
+
+        let bodyHtml = '';
+        familiasSorted.forEach(fam => {
+            // Fila de familia (cabecera de grupo)
+            bodyHtml += `<tr style="background:rgba(167,139,250,0.08);">
+                <td style="padding:6px 8px; font-size:0.78rem; font-weight:700; color:${color}; border-top:1px solid #334155;">${fam}</td>`;
+            cols.forEach((col,i) => {
+                const vf1 = valFamProd(fam, col.advList, y1, m1);
+                const tf1 = totalGlobal(col.advList, y1, m1);
+                const pf1 = tf1>0 ? ((vf1/tf1)*100).toFixed(1) : '0.0';
+                bodyHtml += `<td class="mix-td-val${i>0?' mix-sep-left':''}" style="border-top:1px solid #334155; font-weight:700;">
+                    <span class="mix-pct" style="color:${color};">${pf1}%</span>
+                    <span class="mix-amount">(${formatCurrency(vf1)})</span></td>`;
+                if (hasComp) {
+                    const vf2 = valFamProd(fam, col.advList, y2, m2);
+                    const tf2 = totalGlobal(col.advList, y2, m2);
+                    const pf2 = tf2>0 ? ((vf2/tf2)*100).toFixed(1) : '0.0';
+                    bodyHtml += `<td class="mix-td-val" style="border-top:1px solid #334155; font-weight:700; opacity:0.85;">
+                        <span class="mix-pct" style="color:${color};">${pf2}%</span>
+                        <span class="mix-amount" style="color:var(--comp);">(${formatCurrency(vf2)})</span></td>`;
+                }
+            });
+            bodyHtml += `</tr>`;
+
+            // Filas de productos dentro de esta familia, ordenados por ingreso desc
+            const prods = [...famProdMap[fam]].sort((a, b) =>
+                valProd(b, selectedAdvs, y1, m1) - valProd(a, selectedAdvs, y1, m1));
+
+            prods.forEach(prod => {
+                bodyHtml += `<tr>
+                    <td style="padding:4px 8px 4px 22px; font-size:0.76rem; color:#94a3b8; white-space:nowrap;">↳ ${prod}</td>`;
+                cols.forEach((col,i) => {
+                    const v1 = valProd(prod, col.advList, y1, m1);
+                    const t1 = totalGlobal(col.advList, y1, m1);
+                    const p1 = t1>0 ? ((v1/t1)*100).toFixed(1) : '0.0';
+                    bodyHtml += `<td class="mix-td-val${i>0?' mix-sep-left':''}">
+                        <span class="mix-pct" style="color:#94a3b8;">${p1}%</span>
+                        <span class="mix-amount" style="color:#cbd5e1;">(${formatCurrency(v1)})</span></td>`;
+                    if (hasComp) {
+                        const v2 = valProd(prod, col.advList, y2, m2);
+                        const t2 = totalGlobal(col.advList, y2, m2);
+                        const p2 = t2>0 ? ((v2/t2)*100).toFixed(1) : '0.0';
+                        bodyHtml += `<td class="mix-td-val" style="opacity:0.85;">
+                            <span class="mix-pct" style="color:#94a3b8;">${p2}%</span>
+                            <span class="mix-amount" style="color:var(--comp);">(${formatCurrency(v2)})</span></td>`;
+                    }
+                });
+                bodyHtml += `</tr>`;
+            });
+        });
+
+        // Fila TOTAL global
+        bodyHtml += `<tr class="mix-total-row"><td class="mix-td-label" style="color:${color};">TOTAL</td>`;
+        cols.forEach((col,i) => {
+            const t1 = totalGlobal(col.advList, y1, m1);
+            bodyHtml += `<td class="mix-td-val${i>0?' mix-sep-left':''}"><span class="mix-pct" style="color:#e2e8f0;">100%</span><span class="mix-amount">(${formatCurrency(t1)})</span></td>`;
+            if (hasComp) {
+                const t2 = totalGlobal(col.advList, y2, m2);
+                bodyHtml += `<td class="mix-td-val"><span class="mix-pct" style="color:#e2e8f0;">100%</span><span class="mix-amount" style="color:var(--comp);">(${formatCurrency(t2)})</span></td>`;
+            }
+        });
+        bodyHtml += `</tr>`;
+        getEl(bodyId).innerHTML = bodyHtml;
+        return;
+    }
+
+    // ════ MODO SITES ════
+    // Recoger todos los sites presentes en los datos, separados por tipo
+    const digitalSitesData = new Set();
+    const printSitesData   = new Set();
+    const eventosSitesData = new Set();
+    ['DIGITAL','PRINT','EVENTOS'].forEach(tipo => {
+        rawDataCache[tipo]?.forEach(d => {
+            if (selectedAdvs.includes(d.Anunciante) &&
+                (y1 === 'Todos' || d.Año === y1 || (y2 !== 'Sin comparar' && d.Año === y2)) && d.Site) {
+                if (tipo === 'DIGITAL')       digitalSitesData.add(d.Site);
+                else if (tipo === 'PRINT')    printSitesData.add(d.Site);
+                else                          eventosSitesData.add(d.Site);
+            }
+        });
+    });
+
+    if (digitalSitesData.size + printSitesData.size + eventosSitesData.size === 0) {
+        block.style.display = 'none'; return;
+    }
+
+    // Construir pares: primero lista fija, luego matching automático para los que queden
+    const pairs = []; // { dSite, pSite, eSite, dLabel, pLabel, eLabel }
+    const usedDigital = new Set();
+    const usedPrint   = new Set();
+    const usedEventos = new Set();
+
+    // 1. Aplicar lista fija
+    SITE_PAIRS_FIXED.forEach(fp => {
+        const dPresent = fp.digital  && digitalSitesData.has(fp.digital);
+        const pPresent = fp.print    && printSitesData.has(fp.print);
+        const ePresent = fp.eventos  && eventosSitesData.has(fp.eventos);
+        // Solo crear fila si al menos uno está presente
+        if (dPresent || pPresent || ePresent) {
+            pairs.push({
+                dSite:  dPresent ? fp.digital  : null,
+                pSite:  pPresent ? fp.print    : null,
+                eSite:  ePresent ? fp.eventos  : null,
+                dLabel: dPresent ? fp.displayDigital  : '',
+                pLabel: pPresent ? fp.displayPrint    : '',
+                eLabel: ePresent ? fp.displayEventos  : ''
+            });
+            if (dPresent) usedDigital.add(fp.digital);
+            if (pPresent) usedPrint.add(fp.print);
+            if (ePresent) usedEventos.add(fp.eventos);
+        }
+    });
+
+    // 2. Matching automático para digitales no asignados
+    const remainDigital = [...digitalSitesData].filter(s => !usedDigital.has(s));
+    const remainPrint   = [...printSitesData].filter(s => !usedPrint.has(s));
+
+    remainDigital.forEach(dSite => {
+        const dk = siteKey(dSite);
+        let bestPrint = null, bestScore = 0;
+        remainPrint.forEach(pSite => {
+            if (usedPrint.has(pSite)) return;
+            const pk = siteKey(pSite);
+            let common = 0;
+            for (let i = 0; i < Math.min(dk.length, pk.length); i++) {
+                if (dk[i] === pk[i]) common++; else break;
+            }
+            const score = common / Math.max(dk.length, pk.length, 1);
+            if (score > bestScore && score >= 0.45) { bestScore = score; bestPrint = pSite; }
+        });
+        const remainEventos2 = [...eventosSitesData].filter(s => !usedEventos.has(s));
+        let bestEvento = null, bestEScore = 0;
+        remainEventos2.forEach(eSite => {
+            const ek = siteKey(eSite);
+            let common = 0;
+            for (let i = 0; i < Math.min(dk.length, ek.length); i++) {
+                if (dk[i] === ek[i]) common++; else break;
+            }
+            const score = common / Math.max(dk.length, ek.length, 1);
+            if (score > bestEScore && score >= 0.45) { bestEScore = score; bestEvento = eSite; }
+        });
+        if (bestPrint)  usedPrint.add(bestPrint);
+        if (bestEvento) usedEventos.add(bestEvento);
+        usedDigital.add(dSite);
+        pairs.push({
+            dSite, pSite: bestPrint, eSite: bestEvento,
+            dLabel: siteDisplayName(dSite),
+            pLabel: bestPrint  ? siteDisplayName(bestPrint)  : '',
+            eLabel: bestEvento ? siteDisplayName(bestEvento) : ''
+        });
+    });
+
+    // 3. Print sin pareja
+    [...printSitesData].filter(s => !usedPrint.has(s)).forEach(pSite => {
+        pairs.push({ dSite: null, pSite, eSite: null, dLabel: '', pLabel: siteDisplayName(pSite), eLabel: '' });
+    });
+
+    // 4. Eventos
+    [...eventosSitesData].filter(s => !usedEventos.has(s)).forEach(eSite => {
+        pairs.push({ dSite: null, pSite: null, eSite, dLabel: '', pLabel: '', eLabel: siteDisplayName(eSite) });
+        usedEventos.add(eSite);
+    });
+
+    // Valor de un par para un conjunto de advs y un año
+    const valPair = (pair, advList, y, months) => {
+        let total = 0;
+        if (pair.dSite) total += (rawDataCache['DIGITAL']||[]).filter(d =>
+            advList.includes(d.Anunciante) && (y==='Todos'||d.Año===y) && (months.length===0||months.includes(d.Mes)) && d.Site===pair.dSite
+        ).reduce((a,b)=>a+b.ingreso,0);
+        if (pair.pSite) total += (rawDataCache['PRINT']||[]).filter(d =>
+            advList.includes(d.Anunciante) && (y==='Todos'||d.Año===y) && (months.length===0||months.includes(d.Mes)) && d.Site===pair.pSite
+        ).reduce((a,b)=>a+b.ingreso,0);
+        if (pair.eSite) total += (rawDataCache['EVENTOS']||[]).filter(d =>
+            advList.includes(d.Anunciante) && (y==='Todos'||d.Año===y) && (months.length===0||months.includes(d.Mes)) && d.Site===pair.eSite
+        ).reduce((a,b)=>a+b.ingreso,0);
+        return total;
+    };
+
+    // Ingreso digital año base para ordenar
+    const digitalVal1 = pair => {
+        if (!pair.dSite) return 0;
+        return (rawDataCache['DIGITAL']||[]).filter(d =>
+            selectedAdvs.includes(d.Anunciante) && (y1==='Todos'||d.Año===y1) && d.Site===pair.dSite
+        ).reduce((a,b)=>a+b.ingreso,0);
+    };
+
+    // Ordenar: publicaciones con digital primero (por ingreso digital desc), luego solo-print, luego solo-eventos
+    const withDigital = pairs.filter(p => p.dSite).sort((a,b) => digitalVal1(b) - digitalVal1(a));
+    const onlyPrint   = pairs.filter(p => !p.dSite &&  p.pSite && !p.eSite);
+    const onlyEventos = pairs.filter(p => !p.dSite && !p.pSite &&  p.eSite);
+    const mixPrintEv  = pairs.filter(p => !p.dSite &&  p.pSite &&  p.eSite);
+    const orderedPairs = [...withDigital, ...mixPrintEv, ...onlyPrint, ...onlyEventos];
+
+    const totalAllPairs = (advList, y, months) =>
+        orderedPairs.reduce((s,p) => s + valPair(p, advList, y, months), 0);
+
+    const colSpan = hasComp ? 2 : 1;
+
+    // Cabecera con 3 columnas de publicación (Digital · Print · Eventos)
+    let headHtml = `<tr>
+        <th style="border-bottom:2px solid #38bdf8; padding:6px 6px; text-align:center; color:#38bdf8; font-size:0.72rem; min-width:110px;">Digital</th>
+        <th style="border-bottom:2px solid #f472b6; padding:6px 6px; text-align:center; color:#f472b6; font-size:0.72rem; min-width:110px; border-left:1px solid #1f2937;">Print</th>
+        <th style="border-bottom:2px solid #34d399; padding:6px 6px; text-align:center; color:#34d399; font-size:0.72rem; min-width:90px; border-left:1px solid #1f2937;">Eventos</th>`;
+    cols.forEach((col,i) => {
+        headHtml += `<th colspan="${colSpan}" class="mix-th-group" style="color:${col.color};${i>0?'border-left:2px solid #334155;':''}">${col.label}</th>`;
+    });
+    headHtml += `</tr><tr>
+        <th style="border-bottom:1px solid rgba(255,255,255,0.1);"></th>
+        <th style="border-bottom:1px solid rgba(255,255,255,0.1); border-left:1px solid #1f2937;"></th>
+        <th style="border-bottom:1px solid rgba(255,255,255,0.1); border-left:1px solid #1f2937;"></th>`;
+    cols.forEach((col,i) => {
+        headHtml += `<th ${i>0?'class="mix-sep-left"':''} class="mix-th-year">${y1!=='Todos'?y1:'Base'}</th>`;
+        if (hasComp) headHtml += `<th class="mix-th-year" style="color:var(--comp);">${y2}</th>`;
+    });
+    headHtml += `</tr>`;
+    getEl(headId).innerHTML = headHtml;
+
+    let bodyHtml = '';
+    orderedPairs.forEach(pair => {
+        const dLabel = pair.dLabel || '<span style="color:#475569;">—</span>';
+        const pLabel = pair.pLabel || '<span style="color:#475569;">—</span>';
+        const eLabel = pair.eLabel || '<span style="color:#475569;">—</span>';
+        bodyHtml += `<tr>
+            <td style="padding:5px 6px; font-size:0.75rem; color:#38bdf8; white-space:nowrap; min-width:110px;">${dLabel}</td>
+            <td style="padding:5px 6px; font-size:0.75rem; color:#f472b6; white-space:nowrap; min-width:110px; border-left:1px solid #1f2937;">${pLabel}</td>
+            <td style="padding:5px 6px; font-size:0.75rem; color:#34d399; white-space:nowrap; min-width:90px; border-left:1px solid #1f2937;">${eLabel}</td>`;
+        cols.forEach((col,i) => {
+            const v1 = valPair(pair, col.advList, y1, m1);
+            const t1 = totalAllPairs(col.advList, y1, m1);
+            const p1 = t1>0 ? ((v1/t1)*100).toFixed(1) : '0.0';
+            bodyHtml += `<td class="mix-td-val${i>0?' mix-sep-left':''}"><span class="mix-pct" style="color:${color};">${p1}%</span><span class="mix-amount">(${formatCurrency(v1)})</span></td>`;
+            if (hasComp) {
+                const v2 = valPair(pair, col.advList, y2, m2);
+                const t2 = totalAllPairs(col.advList, y2, m2);
+                const p2 = t2>0 ? ((v2/t2)*100).toFixed(1) : '0.0';
+                bodyHtml += `<td class="mix-td-val" style="opacity:0.85;"><span class="mix-pct" style="color:${color};">${p2}%</span><span class="mix-amount" style="color:var(--comp);">(${formatCurrency(v2)})</span></td>`;
+            }
+        });
+        bodyHtml += `</tr>`;
+    });
+    bodyHtml += `<tr class="mix-total-row"><td colspan="3" class="mix-td-label" style="color:${color};">TOTAL</td>`;
+    cols.forEach((col,i) => {
+        const t1 = totalAllPairs(col.advList, y1, m1);
+        bodyHtml += `<td class="mix-td-val${i>0?' mix-sep-left':''}"><span class="mix-pct" style="color:#e2e8f0;">100%</span><span class="mix-amount">(${formatCurrency(t1)})</span></td>`;
+        if (hasComp) {
+            const t2 = totalAllPairs(col.advList, y2, m2);
+            bodyHtml += `<td class="mix-td-val"><span class="mix-pct" style="color:#e2e8f0;">100%</span><span class="mix-amount" style="color:var(--comp);">(${formatCurrency(t2)})</span></td>`;
+        }
+    });
+    bodyHtml += `</tr>`;
+    getEl(bodyId).innerHTML = bodyHtml;
+}
+
+// ── MIX POR ESTACIONES ───────────────────────────────────────────────────
+const ESTACIONES = [
+    { label: '🌱 Primavera', meses: ['04 Abril','05 Mayo','06 Junio'],          color: '#86efac' },
+    { label: '☀️ Verano',   meses: ['07 Julio','08 Agosto','09 Septiembre'],   color: '#fde68a' },
+    { label: '🍂 Otoño',    meses: ['10 Octubre','11 Noviembre','12 Diciembre'], color: '#fdba74' },
+    { label: '❄️ Invierno', meses: ['01 Enero','02 Febrero','03 Marzo'],        color: '#93c5fd' },
+];
+
+function renderMixEstaciones(selectedAdvs, advsWithout, advsOnly, y1, y2, m1, m2, hasComp, cols) {
+    const block = getEl('todosTempBlock');
+    if (selectedAdvs.length === 0) { block.style.display = 'none'; return; }
+    block.style.display = 'block';
+
+    const valEst = (meses, advList, y, months, field) => {
+        // Filtrar por meses de la estación intersectados con meses seleccionados
+        const mesesFiltro = months.length > 0 ? meses.filter(m => months.includes(m)) : meses;
+        if (mesesFiltro.length === 0) return 0;
+        const excel = ['DIGITAL','PRINT','EVENTOS'].reduce((s, tipo) =>
+            s + rawDataMix[tipo].filter(d =>
+                advList.includes(d.Anunciante) && (y==='Todos'||d.Año===y) && mesesFiltro.includes(d.Mes)
+            ).reduce((a,b) => a+b.ingreso, 0), 0);
+        // Programática prorrateada por meses de la estación activos
+        const nTotal = months.length > 0 ? months.length : 12;
+        const prog = advList.reduce((s,a) => s+(progManual[a]?.[field]||0),0) * (mesesFiltro.length / nTotal);
+        return excel + prog;
+    };
+    const totalEst = (advList, y, months, field) =>
+        ESTACIONES.reduce((s,e) => s + valEst(e.meses, advList, y, months, field), 0);
+
+    const colSpan = hasComp ? 2 : 1;
+    const color = '#c084fc';
+
+    let headHtml = `<tr><th style="border-bottom:2px solid ${color}; padding:8px 10px; text-align:left; color:${color}; font-size:0.8rem; min-width:110px;">Estación</th>`;
+    cols.forEach((col,i) => {
+        headHtml += `<th colspan="${colSpan}" class="mix-th-group" style="color:${col.color};${i>0?'border-left:2px solid #334155;':''}">${col.label}</th>`;
+    });
+    headHtml += `</tr><tr><th style="border-bottom:1px solid rgba(255,255,255,0.2);"></th>`;
+    cols.forEach((col,i) => {
+        headHtml += `<th ${i>0?'class="mix-sep-left"':''} class="mix-th-year">${y1!=='Todos'?y1:'Base'}</th>`;
+        if (hasComp) headHtml += `<th class="mix-th-year" style="color:var(--comp);">${y2}</th>`;
+    });
+    headHtml += `</tr>`;
+    getEl('mixTempHead').innerHTML = headHtml;
+
+    let bodyHtml = '';
+    ESTACIONES.forEach(est => {
+        bodyHtml += `<tr><td class="mix-td-label" style="color:${est.color}; font-size:0.85rem; min-width:110px;">${est.label}</td>`;
+        cols.forEach((col,i) => {
+            const v1 = valEst(est.meses, col.advList, y1, m1, 'base');
+            const t1 = totalEst(col.advList, y1, m1, 'base');
+            const p1 = t1>0 ? ((v1/t1)*100).toFixed(1) : '0.0';
+            bodyHtml += `<td class="mix-td-val${i>0?' mix-sep-left':''}"><span class="mix-pct" style="color:${est.color};">${p1}%</span><span class="mix-amount">(${formatCurrency(v1)})</span></td>`;
+            if (hasComp) {
+                const v2 = valEst(est.meses, col.advList, y2, m2, 'comp');
+                const t2 = totalEst(col.advList, y2, m2, 'comp');
+                const p2 = t2>0 ? ((v2/t2)*100).toFixed(1) : '0.0';
+                bodyHtml += `<td class="mix-td-val" style="opacity:0.85;"><span class="mix-pct" style="color:${est.color};">${p2}%</span><span class="mix-amount" style="color:var(--comp);">(${formatCurrency(v2)})</span></td>`;
+            }
+        });
+        bodyHtml += `</tr>`;
+    });
+    bodyHtml += `<tr class="mix-total-row"><td class="mix-td-label" style="color:${color};">TOTAL</td>`;
+    cols.forEach((col,i) => {
+        const t1 = totalEst(col.advList, y1, m1, 'base');
+        bodyHtml += `<td class="mix-td-val${i>0?' mix-sep-left':''}"><span class="mix-pct" style="color:#e2e8f0;">100%</span><span class="mix-amount">(${formatCurrency(t1)})</span></td>`;
+        if (hasComp) {
+            const t2 = totalEst(col.advList, y2, m2, 'comp');
+            bodyHtml += `<td class="mix-td-val"><span class="mix-pct" style="color:#e2e8f0;">100%</span><span class="mix-amount" style="color:var(--comp);">(${formatCurrency(t2)})</span></td>`;
+        }
+    });
+    bodyHtml += `</tr>`;
+    getEl('mixTempBody').innerHTML = bodyHtml;
+}
+
+(function(){
+  const nav = document.querySelector('.hn-bar');
+  if (!nav) return;
+  const active = nav.dataset.active;
+  const link = nav.querySelector(`[data-id="${active}"]`);
+  if (link) link.classList.add('hn-active');
+})();
+
+
+</script>
+
+<!-- ── POPUP EXPORTAR ──────────────────────────────────────────── -->
+<div id="exportPopup" class="popup-overlay" onclick="if(event.target===this)closeExportPopup()">
+    <div class="popup-box">
+        <div class="popup-header">
+            <span class="popup-title" id="exportPopupTitle"></span>
+            <button class="popup-close" onclick="closeExportPopup()">✕</button>
+        </div>
+        <div class="popup-scroll" id="exportPopupContent"></div>
+    </div>
+</div>
+
+<script>
+function openExportPopup(tableId, titleText, mode) {
+    // mode: 'pct' = solo %, 'real' = dato real (Comparativa)
+    const srcTable = document.getElementById(tableId);
+    if (!srcTable) return;
+
+    const popupTable = document.createElement('table');
+    popupTable.className = 'popup-table';
+
+    // Clonar thead
+    const srcHead = srcTable.querySelector('thead');
+    if (srcHead) {
+        const newHead = srcHead.cloneNode(true);
+        // En modo pct, quitar columnas de subencabezado que vienen del año comparación
+        // (no hay nada que filtrar en thead, dejamos todo el encabezado)
+        popupTable.appendChild(newHead);
+    }
+
+    // Clonar tbody filtrando .mix-amount
+    const srcBody = srcTable.querySelector('tbody');
+    if (srcBody) {
+        const newBody = document.createElement('tbody');
+        srcBody.querySelectorAll('tr').forEach(srcTr => {
+            const newTr = document.createElement('tr');
+            newTr.style.cssText = srcTr.style.cssText;
+            srcTr.querySelectorAll('th, td').forEach(srcCell => {
+                const newCell = document.createElement(srcCell.tagName.toLowerCase());
+                newCell.colSpan = srcCell.colSpan;
+                newCell.style.cssText = srcCell.style.cssText;
+                newCell.className = srcCell.className;
+
+                if (mode === 'real') {
+                    // Copiar contenido tal cual
+                    newCell.innerHTML = srcCell.innerHTML;
+                } else {
+                    // Solo porcentaje: copiar solo los .mix-pct, o el texto si no hay
+                    const pcts = srcCell.querySelectorAll('.mix-pct');
+                    if (pcts.length > 0) {
+                        // Celdas de datos: solo el %
+                        pcts.forEach((pct, i) => {
+                            if (i > 0) newCell.appendChild(document.createTextNode(' / '));
+                            const span = pct.cloneNode(true);
+                            newCell.appendChild(span);
+                        });
+                    } else {
+                        // Celdas de etiqueta (primera columna) u otras: copiar tal cual
+                        newCell.innerHTML = srcCell.innerHTML;
+                    }
+                }
+                newTr.appendChild(newCell);
+            });
+            newBody.appendChild(newTr);
+        });
+        popupTable.appendChild(newBody);
+    }
+
+    document.getElementById('exportPopupTitle').textContent = titleText;
+    const content = document.getElementById('exportPopupContent');
+    content.innerHTML = '';
+    content.appendChild(popupTable);
+    document.getElementById('exportPopup').classList.add('active');
+}
+
+function closeExportPopup() {
+    document.getElementById('exportPopup').classList.remove('active');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeExportPopup(); });
+
+
+
+function updateAIAnalysis() {
+    const container = document.getElementById('aiAnalysisContent');
+    const mainBlock = document.getElementById('aiAnalysisBlock');
+    const selectedAdv = document.getElementById('mixExcludeAdv').value;
+
+    if (!selectedAdv) {
+        mainBlock.style.display = 'none';
+        return;
+    }
+
+    mainBlock.style.display = 'block';
+    container.innerHTML = '';
+
+    // Cada bloque a analizar: tableId, título, color, tipo especial
+    const bloques = [
+        { id: 'todosAllCompTable', title: '📊 Comparativa de Anunciantes',          color: '#38bdf8', tipo: 'comp' },
+        { id: 'mixTable',          title: '📐 Mix de Inversión por Canal',           color: '#818cf8', tipo: 'mix'  },
+        { id: 'mixMesesTable',     title: '📅 Mix de Inversión por Meses',           color: '#f59e0b', tipo: 'mix'  },
+        { id: 'mixTempTable',      title: '🌸 Mix de Inversión por Estaciones',      color: '#c084fc', tipo: 'mix'  },
+        { id: 'mixSitesTable',     title: '🌐 Mix de Inversión por Publicación',     color: '#34d399', tipo: 'mix'  },
+        { id: 'mixFamiliasTable',  title: '🏷️ Mix de Inversión por Familia',        color: '#fb923c', tipo: 'mix'  },
+        { id: 'mixProductosTable', title: '🛍️ Mix de Inversión por Producto',       color: '#a78bfa', tipo: 'mix'  },
+    ];
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    const pct = str => parseFloat((str||'').replace('%','').trim()) || 0;
+    const fmt = v => v.toFixed(1) + '%';
+    const adv = selectedAdv.length > 25 ? selectedAdv.slice(0,23)+'…' : selectedAdv;
+
+    // Extrae filas de una tabla como array de objetos {label, todos, sinEl, solo}
+    // Para tablas Mix: cada celda tiene [.mix-pct x3] si hay año base sin comp,
+    // o [.mix-pct x6] si hay comparación de años. Siempre el orden es todos/sinEl/solo
+    function extraerFilas(table, tipo) {
+        const filas = [];
+
+        // Detectar si la tabla tiene año de comparación mirando cuántas celdas de datos hay
+        // Cuando hay comp: orden por col = todos_base, todos_comp, sinEl_base, sinEl_comp, solo_base, solo_comp
+        // Cuando no hay:   orden por col = todos_base, sinEl_base, solo_base
+        // Necesitamos detectar el paso (1 o 2) para saltar correctamente entre columnas
+        let paso = 1; // por defecto sin comparación
+        const primeraFila = table.querySelector('tbody tr:not(.mix-total-row)');
+        if (primeraFila) {
+            const allCells = Array.from(primeraFila.querySelectorAll('td, th'));
+            const firstDataIdx = allCells.findIndex(c => c.querySelector('.mix-pct'));
+            if (firstDataIdx !== -1) {
+                const dataCells = allCells.slice(firstDataIdx);
+                // Si hay 6 o más celdas de datos para 3 columnas, hay comparación
+                paso = dataCells.length >= 6 ? 2 : 1;
+            }
+        }
+
+        table.querySelectorAll('tbody tr:not(.mix-total-row)').forEach(tr => {
+            const cells = tr.querySelectorAll('td, th');
+            if (!cells.length) return;
+            const label = cells[0].innerText.trim().replace(/^↳\s*/, '');
+            if (!label || label === 'TOTAL') return;
+
+            if (tipo === 'comp') {
+                // Tabla Comparativa: columnas son Anunciante | Ingreso Base | Ingreso Comp | Diff%
+                const ingresoTxt = cells[1] ? cells[1].innerText.trim() : '0';
+                const ingreso = parseFloat(ingresoTxt.replace(/[^\d,]/g,'').replace(',','.')) || 0;
+                filas.push({ label, ingreso });
+            } else {
+                const allCells = Array.from(cells);
+                const firstDataIdx = allCells.findIndex(c => c.querySelector('.mix-pct'));
+                if (firstDataIdx === -1) return;
+                const dataCells = allCells.slice(firstDataIdx);
+
+                // Con paso correcto: col0=todos_base, col1=sinEl_base, col2=solo_base
+                // (saltando la celda de comp si existe)
+                const idxTodos = 0;
+                const idxSin   = paso;
+                const idxSolo  = paso * 2;
+
+                const pTodos = pct(dataCells[idxTodos]?.querySelector('.mix-pct')?.innerText);
+                const pSin   = pct(dataCells[idxSin]?.querySelector('.mix-pct')?.innerText);
+                const pSolo  = pct(dataCells[idxSolo]?.querySelector('.mix-pct')?.innerText);
+
+                if (pTodos > 0 || pSin > 0 || pSolo > 0) {
+                    filas.push({ label, todos: pTodos, sinEl: pSin, solo: pSolo });
+                }
+            }
+        });
+        return filas;
+    }
+
+    // ── Generador de texto de análisis ────────────────────────────────────────
+    function analizarBloque(filas, tipo, titulo) {
+        if (!filas.length) return null;
+
+        if (tipo === 'comp') {
+            // Para Comparativa: decir el peso del anunciante sobre el total
+            const total = filas.reduce((s,f) => s + f.ingreso, 0);
+            const propio = filas.find(f => f.label.trim().toUpperCase() === selectedAdv.trim().toUpperCase());
+            if (!propio || total === 0) return null;
+            const peso = ((propio.ingreso / total) * 100).toFixed(1);
+            const ranking = [...filas].sort((a,b) => b.ingreso - a.ingreso).findIndex(f => f.label.trim().toUpperCase() === selectedAdv.trim().toUpperCase()) + 1;
+            return `<b>${adv}</b> representa el <b>${peso}%</b> del total facturado entre los anunciantes seleccionados, ocupando la posición <b>#${ranking}</b> de ${filas.length}.`;
+        }
+
+        // Para tablas Mix: ordenar por diferencia (solo - sinEl)
+        const conDatos = filas.filter(f => f.solo !== undefined);
+        if (!conDatos.length) return null;
+
+        // Calcular diferencia solo vs competencia
+        const ordenadas = conDatos.map(f => ({
+            ...f,
+            diff: f.solo - f.sinEl
+        })).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+
+        // Top diferencias positivas (donde el anunciante supera a la competencia)
+        const sobresale = ordenadas.filter(f => f.diff > 2).slice(0, 2);
+        // Top diferencias negativas (donde la competencia le supera)
+        const infrapondera = ordenadas.filter(f => f.diff < -2).slice(0, 2);
+        // Líneas muy alineadas
+        const alineadas = ordenadas.filter(f => Math.abs(f.diff) <= 2).slice(0, 1);
+
+        const partes = [];
+
+        if (sobresale.length) {
+            const items = sobresale.map(f =>
+                `<b>${f.label}</b> (${fmt(f.solo)} vs ${fmt(f.sinEl)} de la competencia)`
+            ).join(' y ');
+            partes.push(`Sobrepondera en ${items}.`);
+        }
+
+        if (infrapondera.length) {
+            const items = infrapondera.map(f =>
+                `<b>${f.label}</b> (${fmt(f.solo)} vs ${fmt(f.sinEl)} que invierte la competencia)`
+            ).join(' y ');
+            partes.push(`Infrapondera en ${items}.`);
+        }
+
+        if (!sobresale.length && !infrapondera.length && alineadas.length) {
+            partes.push(`Estrategia muy alineada con la competencia en todas las líneas.`);
+        }
+
+        // Recomendación accionable
+        if (infrapondera.length) {
+            const top = infrapondera[0];
+            const gap = (top.sinEl - top.solo).toFixed(1);
+            partes.push(`→ Para acercarse al mercado, debería incrementar su presencia en <b>${top.label}</b> aprox. <b>${gap} p.p.</b>`);
+        } else if (sobresale.length && !infrapondera.length) {
+            partes.push(`→ Su estrategia está por encima del mercado. Puede mantener o diversificar.`);
+        }
+
+        return partes.join(' ');
+    }
+
+    // ── Renderizar cada bloque ─────────────────────────────────────────────────
+    bloques.forEach(cfg => {
+        const table = document.getElementById(cfg.id);
+        if (!table) return;
+        // Si el bloque padre está oculto (display:none en el card), no analizar
+        const card = table.closest('.card');
+        if (card && card.style.display === 'none') return;
+
+        const filas = extraerFilas(table, cfg.tipo);
+        const texto = analizarBloque(filas, cfg.tipo, cfg.title);
+        if (!texto) return;
+
+        const cardEl = document.createElement('div');
+        cardEl.style.cssText = `background: rgba(255,255,255,0.03); padding: 16px 18px;
+            border-radius: 10px; border: 1px solid ${cfg.color}33;
+            border-left: 3px solid ${cfg.color};`;
+        cardEl.innerHTML = `
+            <div style="color:${cfg.color}; font-weight:700; font-size:0.78rem;
+                text-transform:uppercase; letter-spacing:0.05em;
+                margin-bottom:9px; padding-bottom:6px;
+                border-bottom:1px solid ${cfg.color}22;">
+                ${cfg.title}
+            </div>
+            <div style="font-size:0.84rem; color:#e2e8f0; line-height:1.6;">${texto}</div>`;
+        container.appendChild(cardEl);
+    });
+
+    // Si no hay ninguna card generada
+    if (!container.children.length) {
+        container.innerHTML = '<p style="color:#64748b; font-size:0.85rem;">No hay datos suficientes para generar el análisis con los filtros actuales.</p>';
+    }
+}
+
+
+// ── ANÁLISIS IA DE PRODUCTOS ───────────────────────────────────────────────
+function updateAIProductos() {
+    const block   = document.getElementById('aiProductosBlock');
+    const content = document.getElementById('aiProductosContent');
+    const selectedAdv = document.getElementById('mixExcludeAdv').value;
+
+    if (!selectedAdv) { block.style.display = 'none'; return; }
+
+    // Leer la tabla de productos
+    const table = document.getElementById('mixProductosTable');
+    if (!table) { block.style.display = 'none'; return; }
+
+    const prodBlock = document.getElementById('todosProductosBlock');
+    if (prodBlock && prodBlock.style.display === 'none') { block.style.display = 'none'; return; }
+
+    // Extraer filas de producto (las que tienen ↳, no las de familia)
+    const filas = [];
+    table.querySelectorAll('tbody tr').forEach(tr => {
+        const firstCell = tr.querySelector('td');
+        if (!firstCell) return;
+        const rawLabel = firstCell.innerText.trim();
+        // Solo filas de producto (tienen ↳), excluir filas de familia
+        if (!rawLabel.startsWith('↳')) return;
+        const label = rawLabel.replace(/^↳\s*/, '').trim();
+        if (!label || label === 'TOTAL') return;
+
+        const allCells = Array.from(tr.querySelectorAll('td'));
+        const firstDataIdx = allCells.findIndex(c => c.querySelector('.mix-pct'));
+        if (firstDataIdx === -1) return;
+        const dataCells = allCells.slice(firstDataIdx);
+
+        // Agrupamos de 3 en 3: todos / sinEl / solo
+        for (let i = 0; i + 2 < dataCells.length; i += 3) {
+            const pTodos = parseFloat((dataCells[i]?.querySelector('.mix-pct')?.innerText || '').replace('%','')) || 0;
+            const pSin   = parseFloat((dataCells[i+1]?.querySelector('.mix-pct')?.innerText || '').replace('%','')) || 0;
+            const pSolo  = parseFloat((dataCells[i+2]?.querySelector('.mix-pct')?.innerText || '').replace('%','')) || 0;
+            if (pTodos > 0 || pSin > 0 || pSolo > 0) {
+                filas.push({ label, sinEl: pSin, solo: pSolo, diff: pSolo - pSin });
+                break;
+            }
+        }
+    });
+
+    if (!filas.length) { block.style.display = 'none'; return; }
+
+    block.style.display = 'block';
+    content.innerHTML = '';
+
+    const advLabel = selectedAdv.length > 28 ? selectedAdv.slice(0, 26) + '…' : selectedAdv;
+    const fmt1 = v => v.toFixed(1) + '%';
+
+    // ── TOP 10: productos estrella del anunciante (mayor solo vs sinEl) ──────
+    const estrellas = [...filas]
+        .filter(f => f.solo > 0)
+        .sort((a, b) => b.diff - a.diff)
+        .slice(0, 10);
+
+    // ── TOP 10: productos de la competencia donde el anunciante casi no está ──
+    const oportunidades = [...filas]
+        .filter(f => f.sinEl > 0)
+        .sort((a, b) => a.diff - b.diff)
+        .slice(0, 10);
+
+    function renderRanking(titulo, subtitulo, items, colorAdv, colorComp, labelAdv, labelComp, positivo) {
+        if (!items.length) return;
+
+        const maxVal = Math.max(...items.map(f => Math.max(f.solo, f.sinEl)));
+
+        let rowsHtml = items.map((f, idx) => {
+            const barAdv  = maxVal > 0 ? (f.solo  / maxVal * 100).toFixed(0) : 0;
+            const barComp = maxVal > 0 ? (f.sinEl / maxVal * 100).toFixed(0) : 0;
+            const gap = Math.abs(f.diff).toFixed(1);
+            const gapColor = positivo ? '#34d399' : '#f87171';
+            const badgeColor = positivo ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)';
+            const sign = f.diff > 0 ? '+' : '';
+
+            return `
+            <div style="padding: 9px 0; border-bottom: 1px solid #1f2937;">
+                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px;">
+                    <span style="font-size:0.78rem; font-weight:600; color:#e2e8f0; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${f.label}">
+                        <span style="color:#64748b; font-size:0.7rem; margin-right:5px;">#${idx+1}</span>${f.label}
+                    </span>
+                    <span style="font-size:0.72rem; font-weight:700; color:${gapColor}; background:${badgeColor}; padding:1px 7px; border-radius:4px; margin-left:8px; white-space:nowrap;">
+                        ${sign}${gap} p.p.
+                    </span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:3px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="font-size:0.67rem; color:${colorAdv}; width:62px; text-align:right; flex-shrink:0;">${labelAdv}</span>
+                        <div style="flex:1; background:#1f2937; border-radius:3px; height:8px; overflow:hidden;">
+                            <div style="width:${barAdv}%; background:${colorAdv}; height:100%; border-radius:3px; transition:width 0.4s;"></div>
+                        </div>
+                        <span style="font-size:0.75rem; font-weight:700; color:${colorAdv}; width:36px;">${fmt1(f.solo)}</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="font-size:0.67rem; color:${colorComp}; width:62px; text-align:right; flex-shrink:0;">${labelComp}</span>
+                        <div style="flex:1; background:#1f2937; border-radius:3px; height:8px; overflow:hidden;">
+                            <div style="width:${barComp}%; background:${colorComp}; height:100%; border-radius:3px; transition:width 0.4s;"></div>
+                        </div>
+                        <span style="font-size:0.75rem; font-weight:700; color:${colorComp}; width:36px;">${fmt1(f.sinEl)}</span>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+
+        const card = document.createElement('div');
+        card.style.cssText = `background: rgba(255,255,255,0.03); border-radius: 10px;
+            border: 1px solid ${colorAdv}33; border-left: 3px solid ${colorAdv}; padding: 16px 18px;`;
+        card.innerHTML = `
+            <div style="color:${colorAdv}; font-weight:700; font-size:0.78rem;
+                text-transform:uppercase; letter-spacing:0.05em;
+                margin-bottom:4px; padding-bottom:6px;
+                border-bottom:1px solid ${colorAdv}22;">
+                ${titulo}
+            </div>
+            <p style="margin:0 0 10px 0; font-size:0.75rem; color:#64748b; line-height:1.4;">${subtitulo}</p>
+            ${rowsHtml}`;
+        content.appendChild(card);
+    }
+
+    renderRanking(
+        '⭐ Sus productos estrella',
+        `Productos donde <b style="color:#a78bfa;">${advLabel}</b> concentra más inversión que la competencia.`,
+        estrellas,
+        '#a78bfa', '#f59e0b',
+        advLabel, 'Competencia',
+        true
+    );
+
+    renderRanking(
+        '🎯 Oportunidades de mercado',
+        `Productos donde la competencia invierte mucho más que <b style="color:#a78bfa;">${advLabel}</b>.`,
+        oportunidades,
+        '#f59e0b', '#a78bfa',
+        'Competencia', advLabel,
+        false
+    );
+}
+
+// ── ANÁLISIS IA POR COMPETIDOR ────────────────────────────────────────────
+function updateAICompetidores() {
+    const block   = document.getElementById('aiCompetidoresBlock');
+    const content = document.getElementById('aiCompetidoresContent');
+    const excludeAdv = document.getElementById('mixExcludeAdv').value;
+
+    if (!excludeAdv) { block.style.display = 'none'; return; }
+
+    const y1 = document.getElementById('fYear').value;
+    const y2 = document.getElementById('fYear2').value;
+    const m1 = Array.from(document.getElementById('monthsBase').querySelectorAll('input:checked')).map(c => c.value);
+    const selectedAdvs = Array.from(document.getElementById('fAnunciante').querySelectorAll('input:checked')).map(i => i.value);
+    const competidores = selectedAdvs.filter(a => a !== excludeAdv);
+
+    if (!competidores.length) { block.style.display = 'none'; return; }
+
+    // Recoger todos los productos disponibles con datos del año base
+    const allProds = new Set();
+    ['DIGITAL','PRINT','EVENTOS'].forEach(tipo => {
+        (rawDataCache[tipo] || []).forEach(d => {
+            if (d.Product && selectedAdvs.includes(d.Anunciante) &&
+                (y1 === 'Todos' || d.Año === y1) &&
+                (m1.length === 0 || m1.includes(d.Mes))) {
+                allProds.add(d.Product);
+            }
+        });
+    });
+
+    if (!allProds.size) { block.style.display = 'none'; return; }
+
+    // Ingreso por producto y anunciante
+    const ingProdAdv = (prod, adv) =>
+        ['DIGITAL','PRINT','EVENTOS'].reduce((s, tipo) =>
+            s + (rawDataCache[tipo] || []).filter(d =>
+                d.Anunciante === adv && d.Product === prod &&
+                (y1 === 'Todos' || d.Año === y1) &&
+                (m1.length === 0 || m1.includes(d.Mes))
+            ).reduce((a, b) => a + b.ingreso, 0), 0);
+
+    // Total por anunciante incluyendo programática manual (para calcular %)
+    const totalAdv = adv => {
+        const excel = ['DIGITAL','PRINT','EVENTOS'].reduce((s, tipo) =>
+            s + (rawDataCache[tipo] || []).filter(d =>
+                d.Anunciante === adv &&
+                (y1 === 'Todos' || d.Año === y1) &&
+                (m1.length === 0 || m1.includes(d.Mes))
+            ).reduce((a, b) => a + b.ingreso, 0), 0);
+        return excel + (progManual[adv]?.base || 0);
+    };
+
+    const totalExcluido = totalAdv(excludeAdv);
+
+    block.style.display = 'block';
+    content.innerHTML = '';
+
+    const COMP_COLORS = ['#fb923c','#38bdf8','#34d399','#f472b6','#a78bfa','#fbbf24','#60a5fa','#4ade80','#f87171','#c084fc'];
+
+    competidores.forEach((comp, idx) => {
+        const totalComp = totalAdv(comp);
+        if (!totalComp) return;
+
+        const color = COMP_COLORS[idx % COMP_COLORS.length];
+        const compLabel = comp.length > 26 ? comp.slice(0, 24) + '…' : comp;
+        const advLabel  = excludeAdv.length > 26 ? excludeAdv.slice(0, 24) + '…' : excludeAdv;
+
+        // Para cada producto: % del competidor - % del excluido
+        const diffs = [...allProds].map(prod => {
+            const pComp = totalComp > 0 ? (ingProdAdv(prod, comp) / totalComp * 100) : 0;
+            const pExcl = totalExcluido > 0 ? (ingProdAdv(prod, excludeAdv) / totalExcluido * 100) : 0;
+            return { prod, pComp, pExcl, diff: pComp - pExcl };
+        })
+        .filter(f => f.diff > 1 && f.pComp > 0) // solo diferencias relevantes
+        .sort((a, b) => b.diff - a.diff)
+        .slice(0, 5);
+
+        if (!diffs.length) return;
+
+        const maxVal = Math.max(...diffs.map(f => Math.max(f.pComp, f.pExcl)));
+
+        const rowsHtml = diffs.map((f, i) => {
+            const barComp = maxVal > 0 ? (f.pComp / maxVal * 100).toFixed(0) : 0;
+            const barExcl = maxVal > 0 ? (f.pExcl / maxVal * 100).toFixed(0) : 0;
+            const prodLabel = f.prod.length > 32 ? f.prod.slice(0, 30) + '…' : f.prod;
+            return `
+            <div style="padding:8px 0; border-bottom:1px solid #1f2937;">
+                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px;">
+                    <span style="font-size:0.76rem; font-weight:600; color:#e2e8f0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${f.prod}">
+                        <span style="color:#64748b; font-size:0.68rem; margin-right:4px;">#${i+1}</span>${prodLabel}
+                    </span>
+                    <span style="font-size:0.71rem; font-weight:700; color:#34d399; background:rgba(52,211,153,0.12); padding:1px 6px; border-radius:4px; margin-left:8px; white-space:nowrap;">
+                        +${f.diff.toFixed(1)} p.p.
+                    </span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:3px;">
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <span style="font-size:0.64rem; color:${color}; width:58px; text-align:right; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${compLabel}</span>
+                        <div style="flex:1; background:#1f2937; border-radius:3px; height:7px; overflow:hidden;">
+                            <div style="width:${barComp}%; background:${color}; height:100%; border-radius:3px;"></div>
+                        </div>
+                        <span style="font-size:0.72rem; font-weight:700; color:${color}; width:34px;">${f.pComp.toFixed(1)}%</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <span style="font-size:0.64rem; color:#64748b; width:58px; text-align:right; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${advLabel}</span>
+                        <div style="flex:1; background:#1f2937; border-radius:3px; height:7px; overflow:hidden;">
+                            <div style="width:${barExcl}%; background:#475569; height:100%; border-radius:3px;"></div>
+                        </div>
+                        <span style="font-size:0.72rem; font-weight:700; color:#64748b; width:34px;">${f.pExcl.toFixed(1)}%</span>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+
+        const card = document.createElement('div');
+        card.style.cssText = `background:rgba(255,255,255,0.03); border-radius:10px;
+            border:1px solid ${color}33; border-left:3px solid ${color}; padding:14px 16px;`;
+        card.innerHTML = `
+            <div style="color:${color}; font-weight:800; font-size:0.8rem;
+                text-transform:uppercase; letter-spacing:0.04em;
+                margin-bottom:4px; padding-bottom:6px; border-bottom:1px solid ${color}22;">
+                ${compLabel}
+            </div>
+            <p style="margin:0 0 8px 0; font-size:0.72rem; color:#64748b;">
+                Productos donde supera a <b style="color:#94a3b8;">${advLabel}</b>
+            </p>
+            ${rowsHtml}`;
+        content.appendChild(card);
+    });
+
+    if (!content.children.length) {
+        block.style.display = 'none';
+    }
+}
+
+// ── POPUP BLOQUE IA 3: Ventajas por Competidor ────────────────────────────
+function openAICompetidoresPopup() {
+    const content = document.getElementById('aiCompetidoresContent');
+    if (!content || !content.children.length) return;
+
+    const excludeAdv = document.getElementById('mixExcludeAdv').value;
+    const advLabel = excludeAdv.length > 30 ? excludeAdv.slice(0, 28) + '…' : excludeAdv;
+
+    let html = `<div style="font-size:0.78rem; color:#64748b; margin-bottom:16px;">
+        Ventajas de cada competidor sobre <b style="color:#fb923c;">${advLabel}</b>
+    </div>`;
+
+    Array.from(content.children).forEach(card => {
+        const tituloEl = card.querySelector('div:first-child');
+        const titulo   = tituloEl ? tituloEl.innerText.trim() : '';
+        const color    = tituloEl ? (tituloEl.style.color || '#fb923c') : '#fb923c';
+
+        const filas = [];
+        card.querySelectorAll('div[style*="border-bottom"]').forEach(row => {
+            const nombreEl = row.querySelector('span[title]');
+            const badgeEl  = row.querySelector('span[style*="border-radius:4px"]');
+            if (!nombreEl || !badgeEl) return;
+            const nombre = nombreEl.innerText.replace(/^#\d+\s*/, '').trim();
+            const diff   = badgeEl.innerText.trim();
+            if (nombre) filas.push({ nombre, diff });
+        });
+
+        if (!filas.length) return;
+
+        const rows = filas.map((f, i) =>
+            `<tr>
+                <td style="color:#64748b; font-size:0.75rem; width:28px;">#${i+1}</td>
+                <td>${f.nombre}</td>
+                <td style="text-align:center; font-weight:700; color:#34d399; white-space:nowrap;">${f.diff}</td>
+            </tr>`
+        ).join('');
+
+        html += `
+            <div style="margin-bottom:20px;">
+                <div style="font-weight:800; color:${color}; font-size:0.82rem; text-transform:uppercase;
+                    letter-spacing:0.05em; margin-bottom:8px; padding-bottom:5px;
+                    border-bottom:2px solid ${color}44;">${titulo}</div>
+                <table class="popup-table" style="min-width:340px;">
+                    <thead><tr>
+                        <th style="width:28px;"></th>
+                        <th>Producto</th>
+                        <th style="text-align:center; color:#34d399;">Ventaja (p.p.)</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>`;
+    });
+
+    document.getElementById('exportPopupTitle').textContent = '🔍 Ventajas por Competidor IA';
+    document.getElementById('exportPopupContent').innerHTML = html;
+    document.getElementById('exportPopup').classList.add('active');
+}
+
+function openAIAnalysisPopup() {
+    const content = document.getElementById('aiAnalysisContent');
+    if (!content || !content.children.length) return;
+
+    let tableHtml = `<table class="popup-table" style="min-width:480px;">
+        <thead><tr>
+            <th style="color:#34d399;">Bloque</th>
+            <th>Análisis</th>
+        </tr></thead><tbody>`;
+
+    Array.from(content.children).forEach(card => {
+        const tituloEl = card.querySelector('div:first-child');
+        const textoEl  = card.querySelector('div:last-child');
+        const titulo   = tituloEl ? tituloEl.innerText.trim() : '';
+        const texto    = textoEl  ? textoEl.innerHTML : '';
+        tableHtml += `<tr>
+            <td style="white-space:nowrap; font-weight:700; color:#34d399; vertical-align:top; padding-right:16px;">${titulo}</td>
+            <td style="font-size:0.82rem; line-height:1.6;">${texto}</td>
+        </tr>`;
+    });
+
+    tableHtml += `</tbody></table>`;
+
+    document.getElementById('exportPopupTitle').textContent = '✨ Análisis Estratégico IA';
+    document.getElementById('exportPopupContent').innerHTML = tableHtml;
+    document.getElementById('exportPopup').classList.add('active');
+}
+
+// ── POPUP BLOQUE IA 2: Análisis de Producto ───────────────────────────────
+function openAIProductosPopup() {
+    const content = document.getElementById('aiProductosContent');
+    if (!content || !content.children.length) return;
+
+    const selectedAdv = document.getElementById('mixExcludeAdv').value;
+    const advLabel = selectedAdv.length > 30 ? selectedAdv.slice(0,28)+'…' : selectedAdv;
+
+    function extraerFilasDeCard(card) {
+        const filas = [];
+        card.querySelectorAll('div[style*="border-bottom"]').forEach(row => {
+            const nombreEl = row.querySelector('span[title]');
+            const badgeEl  = row.querySelector('span[style*="border-radius:4px"]');
+            if (!nombreEl || !badgeEl) return;
+            const nombre = nombreEl.innerText.replace(/^#\d+\s*/, '').trim();
+            const diff   = badgeEl.innerText.trim();
+            if (nombre) filas.push({ nombre, diff });
+        });
+        return filas;
+    }
+
+    const cards = Array.from(content.children);
+    const filasEstrellas     = cards[0] ? extraerFilasDeCard(cards[0]) : [];
+    const filasOportunidades = cards[1] ? extraerFilasDeCard(cards[1]) : [];
+
+    const fmtBloque = (titulo, color, filas) => {
+        if (!filas.length) return '';
+        const rows = filas.map((f, i) =>
+            `<tr>
+                <td style="color:#64748b; font-size:0.75rem; width:32px;">#${i+1}</td>
+                <td>${f.nombre}</td>
+                <td style="text-align:center; font-weight:700; color:${color}; white-space:nowrap;">${f.diff}</td>
+            </tr>`
+        ).join('');
+        return `
+            <div style="margin-bottom:24px;">
+                <div style="font-weight:800; color:${color}; font-size:0.82rem; text-transform:uppercase;
+                    letter-spacing:0.05em; margin-bottom:10px; padding-bottom:6px;
+                    border-bottom:2px solid ${color}44;">${titulo}</div>
+                <table class="popup-table" style="min-width:380px;">
+                    <thead><tr>
+                        <th style="width:32px;"></th>
+                        <th>Producto</th>
+                        <th style="text-align:center; color:${color};">Diferencia (p.p.)</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>`;
+    };
+
+    const html =
+        `<div style="font-size:0.78rem; color:#64748b; margin-bottom:16px;">
+            Anunciante: <b style="color:#a78bfa;">${advLabel}</b> vs Competencia
+        </div>` +
+        fmtBloque('⭐ Sus productos estrella', '#a78bfa', filasEstrellas) +
+        fmtBloque('🎯 Oportunidades de mercado', '#f59e0b', filasOportunidades);
+
+    document.getElementById('exportPopupTitle').textContent = '🛍️ Análisis de Producto IA';
+    document.getElementById('exportPopupContent').innerHTML = html;
+    document.getElementById('exportPopup').classList.add('active');
+}
+
+</script>
