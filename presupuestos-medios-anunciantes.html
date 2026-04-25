@@ -4,7 +4,355 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Dashboard Publicitario — Análisis Completo</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
+// ══════════════════════════════════════════════════════════════════════════════
+// VISTA PM SIN LÍNEAS 0€ — lógica independiente
+// ══════════════════════════════════════════════════════════════════════════════
+let mPMSortCol0='pm', mPMSortAsc0=false;
+let mExpandedAnuns0 = new Set();
+
+// Click expand/collapse para la tabla s/0
+document.addEventListener('click', function(e){
+  const row = e.target.closest('tr[data-toggle-anun0]');
+  if(!row) return;
+  const name = decodeURIComponent(row.getAttribute('data-toggle-anun0'));
+  if(mExpandedAnuns0.has(name)) mExpandedAnuns0.delete(name);
+  else mExpandedAnuns0.add(name);
+  renderTable0();
+});
+
+function sortPMTable0(col){
+  if(mPMSortCol0===col) mPMSortAsc0=!mPMSortAsc0;
+  else{ mPMSortCol0=col; mPMSortAsc0=false; }
+  ['pm','pmPrev','delta'].forEach(c=>{
+    const el=document.getElementById('m0-th-'+c.replace('pmPrev','pmprev'));
+    if(el){
+      const labels={'pm':'PM Año sel.','pmPrev':'PM Año ant.','delta':'% Var.'};
+      el.textContent=labels[c]+(mPMSortCol0===c?(mPMSortAsc0?' ↑':' ↓'):' ↕');
+    }
+  });
+  renderTable0();
+}
+
+// Calcula PM igual que calcPresupuestoMedio pero ANTES elimina filas con _ingreso===0
+function calcPresupuestoMedio0(rows){
+  const rows0 = rows.filter(r => r._ingreso !== 0);
+  return calcPresupuestoMedio(rows0);
+}
+
+function getFiltered0(){
+  // Mismos filtros que la vista principal pero sin líneas con ingreso 0
+  const base = mGetFiltered();
+  return base.filter(r => r._ingreso !== 0);
+}
+
+function getPrevFiltered0(yr){
+  const prev = mGetPrevFiltered(yr);
+  return prev.filter(r => r._ingreso !== 0);
+}
+
+function renderTable0(){
+  const data = getFiltered0();
+  const yr = document.getElementById('m-f-year').value;
+  const hasPrev = yr && yr !== 'all';
+  const prevRows = hasPrev ? getPrevFiltered0(yr) : [];
+
+  let nuevosSet=new Set(), perdidosSet=new Set();
+  let prevAnunRowsMap=new Map();
+
+  if(hasPrev){
+    prevRows.forEach(r=>{
+      const a=(r[COL_ANUN]||'').trim();
+      if(!prevAnunRowsMap.has(a)) prevAnunRowsMap.set(a,[]);
+      prevAnunRowsMap.get(a).push(r);
+    });
+    const curAnuns=new Set(data.map(r=>(r[COL_ANUN]||'').trim()));
+    const prevAnuns=new Set(prevAnunRowsMap.keys());
+    curAnuns.forEach(a=>{if(!prevAnuns.has(a)) nuevosSet.add(a);});
+    prevAnuns.forEach(a=>{if(!curAnuns.has(a)) perdidosSet.add(a);});
+  }
+
+  // Agrupar por anunciante
+  const anunMap=new Map();
+  data.forEach(r=>{
+    const anun=(r[COL_ANUN]||'').trim();
+    if(!anunMap.has(anun)) anunMap.set(anun,{rows:[]});
+    anunMap.get(anun).rows.push(r);
+  });
+
+  let anunList=[...anunMap.entries()].map(([anun,val])=>{
+    const {pm,netIngreso,netCount}=calcPresupuestoMedio0(val.rows);
+    const prevRowsAnun=prevAnunRowsMap.get(anun)||[];
+    const {pm:pmPrev}=calcPresupuestoMedio0(prevRowsAnun);
+    const delta=(pm>0&&pmPrev>0)?((pm-pmPrev)/pmPrev)*100:null;
+    return {anun,rows:val.rows,pm,netIngreso,netCount,pmPrev,delta};
+  });
+
+  anunList.sort((a,b)=>{
+    if(mPMSortCol0==='delta'){
+      const da=a.delta??(mPMSortAsc0?-Infinity:Infinity);
+      const db=b.delta??(mPMSortAsc0?-Infinity:Infinity);
+      return mPMSortAsc0?da-db:db-da;
+    }
+    if(mPMSortCol0==='pmPrev') return mPMSortAsc0?a.pmPrev-b.pmPrev:b.pmPrev-a.pmPrev;
+    return mPMSortAsc0?a.pm-b.pm:b.pm-a.pm;
+  });
+
+  const estadoFilter=document.getElementById('m-f-estado-anun').value;
+  let perdidoList=[];
+  if(hasPrev&&estadoFilter!=='ganados'){
+    perdidosSet.forEach(anun=>{
+      const pRowsAnun=prevAnunRowsMap.get(anun)||[];
+      const {pm:pmPrev}=calcPresupuestoMedio0(pRowsAnun);
+      perdidoList.push({anun,pmPrev});
+    });
+    perdidoList.sort((a,b)=>b.pmPrev-a.pmPrev);
+  }
+
+  document.getElementById('m0-tabla-count-msg').textContent=
+    `${anunList.length} anunciantes`+(perdidoList.length?` · ${perdidoList.length} perdidos`:'');
+
+  const NCOLS=10;
+  const tbody=document.getElementById('m0-tabla-body');
+  if(!anunList.length&&!perdidoList.length){
+    tbody.innerHTML=`<tr><td colspan="${NCOLS}" style="text-align:center;color:var(--text3);padding:32px">Sin datos para los filtros seleccionados</td></tr>`;
+    return;
+  }
+
+  // Helper celdas PM (reutiliza mismo estilo)
+  function pmCells0(pm,pmPrev,delta,isNuevo,isPerdido){
+    const pmStr=pm>0?fmtAvg(Math.round(pm)):'—';
+    const pmPrevStr=pmPrev>0?fmtAvg(Math.round(pmPrev)):'—';
+    let deltaHtml;
+    if(isPerdido){
+      deltaHtml=`<td class="pm-col-delta"><span class="badge-perdido">PERDIDO</span></td>`;
+    } else if(isNuevo||!hasPrev){
+      deltaHtml=`<td class="pm-col-delta">${hasPrev?'<span class="badge-nuevo">NUEVO</span>':'—'}</td>`;
+    } else if(delta===null){
+      deltaHtml=`<td class="pm-col-delta" style="color:var(--text3)">—</td>`;
+    } else {
+      const sign=delta>=0?'+':'';
+      const col=delta>=0?'var(--green)':'var(--red)';
+      deltaHtml=`<td class="pm-col-delta" style="color:${col};font-weight:700">${sign}${delta.toFixed(1)}%</td>`;
+    }
+    return `<td class="pm-col-cur">${pmStr}</td><td class="pm-col-prev">${pmPrevStr}</td>${deltaHtml}`;
+  }
+
+  let html='';
+
+  anunList.forEach(({anun,rows,pm,netCount,pmPrev,delta})=>{
+    const isExpanded=mExpandedAnuns0.has(anun);
+    const isNuevo=nuevosSet.has(anun);
+
+    const pubMap={},secMap={},areaMap={},canalMap={},comMap={};
+    rows.forEach(r=>{
+      const p=(r._pubNorm||''); pubMap[p]=(pubMap[p]||0)+r._ingreso;
+      const s=(r._sectorClean||''); secMap[s]=(secMap[s]||0)+1;
+      const a=(r[COL_AREA]||'').trim(); areaMap[a]=(areaMap[a]||0)+1;
+      const c=(r._canal||''); canalMap[c]=(canalMap[c]||0)+r._ingreso;
+      const co=fmtComercial(r[COL_COMERCIAL]); comMap[co]=(comMap[co]||0)+r._ingreso;
+    });
+    const topPub=Object.entries(pubMap).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+    const topSector=Object.entries(secMap).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+    const topArea=Object.entries(areaMap).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+    const topCanal=Object.entries(canalMap).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+    const topCom=Object.entries(comMap).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+    const multiPub=Object.keys(pubMap).filter(k=>k).length>1;
+    const canalPill=topCanal?`<span class="pill ${CANAL_PILL[topCanal]||'pill-blue'}">${topCanal}${Object.keys(canalMap).filter(k=>k).length>1?' +':''}</span>`:'';
+    const nuevoBadge=isNuevo?`<span class="pill pill-green" style="margin-left:6px;font-size:9px">NUEVO</span>`:'';
+    const insLabel=netCount>0?`${netCount} ins.`:`${rows.length} ins.`;
+
+    html+=`<tr class="anun-row-header${isExpanded?' expanded':''}" data-toggle-anun0="${encodeURIComponent(anun)}" style="cursor:pointer">
+      <td class="td-left"><div style="display:flex;align-items:center">
+        <span class="anun-toggle-icon">${isExpanded?'▲':'▼'}</span>
+        <strong style="color:var(--text)">${anun}</strong>${nuevoBadge}
+        <span style="font-size:10px;color:var(--text3);margin-left:8px">${insLabel}</span>
+      </div></td>
+      <td style="font-size:11px;color:var(--text3)">${topPub}${multiPub?'<span style="color:var(--blue);font-size:9px;margin-left:3px">+varios</span>':''}</td>
+      <td style="font-size:11px;color:var(--text3)">—</td>
+      <td style="font-size:11px;color:var(--text3)">${topSector}</td>
+      <td style="font-size:11px;color:var(--text3)">${topArea}</td>
+      <td>${canalPill}</td>
+      <td style="font-size:11px;color:var(--text3)">${topCom}</td>
+      ${pmCells0(pm,pmPrev,delta,isNuevo,false)}
+    </tr>`;
+
+    if(isExpanded){
+      // Nivel MARCA
+      const marcaMap=new Map();
+      rows.forEach(r=>{
+        const marca=(r[COL_MARCA]||'').trim()||'(sin marca)';
+        if(!marcaMap.has(marca)) marcaMap.set(marca,{rows:[]});
+        marcaMap.get(marca).rows.push(r);
+      });
+
+      const prevMarcaRowsMap=new Map();
+      if(hasPrev){
+        (prevAnunRowsMap.get(anun)||[]).forEach(r=>{
+          const m=(r[COL_MARCA]||'').trim()||'(sin marca)';
+          if(!prevMarcaRowsMap.has(m)) prevMarcaRowsMap.set(m,[]);
+          prevMarcaRowsMap.get(m).push(r);
+        });
+      }
+
+      const marcaList=[...marcaMap.entries()].map(([marca,val])=>{
+        const {pm:mPM,netCount:mNC}=calcPresupuestoMedio0(val.rows);
+        const prevMRows=prevMarcaRowsMap.get(marca)||[];
+        const {pm:mPMPrev}=calcPresupuestoMedio0(prevMRows);
+        const mDelta=(mPM>0&&mPMPrev>0)?((mPM-mPMPrev)/mPMPrev)*100:null;
+        const mIsNuevo=hasPrev&&!prevMarcaRowsMap.has(marca);
+        return {marca,rows:val.rows,pm:mPM,netCount:mNC,pmPrev:mPMPrev,delta:mDelta,isNuevo:mIsNuevo};
+      }).sort((a,b)=>b.pm-a.pm);
+
+      marcaList.forEach(({marca,rows:mRows,pm:mPM,netCount:mNC,pmPrev:mPMPrev,delta:mDelta,isNuevo:mIsNuevo})=>{
+        const marcaKey=anun+'::'+marca;
+        const isMarcaExpanded=mExpandedAnuns0.has(marcaKey);
+        const mCanal=mRows.reduce((best,r)=>(!best||r._ingreso>best._ingreso?r:best),null)?._canal||'';
+        const pubs=[...new Set(mRows.map(r=>r._pubNorm).filter(Boolean))];
+        const mInsLabel=mNC>0?`${mNC} ins.`:`${mRows.length} ins.`;
+
+        html+=`<tr class="anun-row-sub marca-row-header" data-toggle-anun0="${encodeURIComponent(marcaKey)}" style="cursor:pointer;background:#f0f2f8">
+          <td class="td-left"><span style="display:inline-flex;align-items:center;gap:6px">
+            <span class="anun-toggle-icon" style="width:15px;height:15px;font-size:8px">${isMarcaExpanded?'▲':'▼'}</span>
+            <span style="color:var(--text2);font-weight:500">↳ ${marca}</span>
+            <span style="font-size:10px;color:var(--text3)">${mInsLabel}</span>
+          </span></td>
+          <td style="font-size:11px;color:var(--text3)">${pubs.slice(0,3).join(', ')}${pubs.length>3?' +':''}</td>
+          <td style="font-size:11px;color:var(--text3)">—</td>
+          <td style="font-size:11px;color:var(--text3)">${mRows[0]?._sectorClean||''}</td>
+          <td style="font-size:11px;color:var(--text3)">${(mRows[0]?.[COL_AREA]||'').trim()}</td>
+          <td><span class="pill ${CANAL_PILL[mCanal]||'pill-blue'}" style="font-size:9px">${mCanal}</span></td>
+          <td style="font-size:11px;color:var(--text3)">${fmtComercial(mRows[0]?.[COL_COMERCIAL])}</td>
+          ${pmCells0(mPM,mPMPrev,mDelta,mIsNuevo,false)}
+        </tr>`;
+
+        if(isMarcaExpanded){
+          // Nivel PRODUCTO+PUB
+          const prodPubMap=new Map();
+          mRows.forEach(r=>{
+            const prod=(r[COL_PROD]||'').trim()||'(sin producto)';
+            const pub=r._pubClean||r._pubNorm||r._pub||'—';
+            const key=prod+'|||'+pub;
+            if(!prodPubMap.has(key)) prodPubMap.set(key,{prod,pub,rows:[],canal:r._canal,sector:r._sectorClean||'',area:(r[COL_AREA]||'').trim(),com:fmtComercial(r[COL_COMERCIAL]||'')});
+            prodPubMap.get(key).rows.push(r);
+          });
+
+          const prevProdPubMap=new Map();
+          if(hasPrev){
+            (prevMarcaRowsMap.get(marca)||[]).forEach(r=>{
+              const prod=(r[COL_PROD]||'').trim()||'(sin producto)';
+              const pub=r._pubClean||r._pubNorm||r._pub||'—';
+              const key=prod+'|||'+pub;
+              if(!prevProdPubMap.has(key)) prevProdPubMap.set(key,[]);
+              prevProdPubMap.get(key).push(r);
+            });
+          }
+
+          const prodList=[...prodPubMap.values()].map(v=>{
+            const {pm:pPM,netCount:pNC}=calcPresupuestoMedio0(v.rows);
+            const prevPRows=prevProdPubMap.get(v.prod+'|||'+v.pub)||[];
+            const {pm:pPMPrev}=calcPresupuestoMedio0(prevPRows);
+            const pDelta=(pPM>0&&pPMPrev>0)?((pPM-pPMPrev)/pPMPrev)*100:null;
+            const pIsNuevo=hasPrev&&prevPRows.length===0;
+            return {...v,pm:pPM,netCount:pNC,pmPrev:pPMPrev,delta:pDelta,isNuevo:pIsNuevo};
+          }).sort((a,b)=>b.pm-a.pm);
+
+          prodList.forEach(({prod,pub,pm:pPM,netCount:pNC,pmPrev:pPMPrev,delta:pDelta,isNuevo:pIsNuevo,canal:pCanal,sector:pSec,area:pArea,com:pCom,rows:pRows})=>{
+            const pInsLabel=pNC>0?`${pNC} ins.`:`${pRows.length} ins.`;
+            html+=`<tr class="anun-row-sub" style="background:#fafbff">
+              <td class="td-left" style="padding-left:52px;font-size:11px">
+                <span style="color:var(--text3)">↳↳ ${prod}</span>
+                <span style="font-size:10px;color:var(--text3);margin-left:6px">${pInsLabel}</span>
+              </td>
+              <td style="font-size:11px;color:var(--text3)">${pub}</td>
+              <td style="font-size:11px;color:var(--text2);font-weight:500">${prod}</td>
+              <td style="font-size:11px;color:var(--text3)">${pSec}</td>
+              <td style="font-size:11px;color:var(--text3)">${pArea}</td>
+              <td><span class="pill ${CANAL_PILL[pCanal]||'pill-blue'}" style="font-size:9px">${pCanal}</span></td>
+              <td style="font-size:11px;color:var(--text3)">${pCom}</td>
+              ${pmCells0(pPM,pPMPrev,pDelta,pIsNuevo,false)}
+            </tr>`;
+          });
+        }
+      });
+
+      // Marcas perdidas
+      if(hasPrev){
+        const curMarcas=new Set(marcaList.map(m=>m.marca));
+        prevMarcaRowsMap.forEach((pMRows,marca)=>{
+          if(curMarcas.has(marca)) return;
+          const {pm:pPMPrev}=calcPresupuestoMedio0(pMRows);
+          const pPubs=[...new Set(pMRows.map(r=>r._pubClean||r._pubNorm||r._pub||'').filter(Boolean))].slice(0,3).join(', ');
+          const pProds=[...new Set(pMRows.map(r=>r._prod||'').filter(Boolean))].slice(0,3).join(', ');
+          const pSector=pMRows[0]?._sectorClean||'';
+          const pArea=(pMRows[0]?.[COL_AREA]||'').trim();
+          const pCanal=pMRows.reduce((best,r)=>(!best||r._ingreso>best._ingreso?r:best),null)?._canal||'';
+          const pCom=fmtComercial(pMRows[0]?.[COL_COMERCIAL]||'');
+          html+=`<tr class="anun-row-sub row-perdido-sub">
+            <td class="td-left"><span style="padding-left:24px">↳ ${marca}</span><span class="badge-perdido" style="margin-left:6px">PERDIDO</span></td>
+            <td style="font-size:11px;color:#991b1b">${pPubs||'—'}</td>
+            <td style="font-size:11px;color:#991b1b">${pProds||'—'}</td>
+            <td style="font-size:11px;color:#991b1b">${pSector||'—'}</td>
+            <td style="font-size:11px;color:#991b1b">${pArea||'—'}</td>
+            <td><span class="pill ${CANAL_PILL[pCanal]||'pill-blue'}" style="font-size:9px">${pCanal}</span></td>
+            <td style="font-size:11px;color:#991b1b">${pCom||'—'}</td>
+            <td class="pm-col-cur" style="color:#991b1b!important">—</td>
+            <td class="pm-col-prev" style="color:#991b1b!important">${fmtAvg(Math.round(pPMPrev))}</td>
+            <td class="pm-col-delta"><span class="badge-perdido">PERDIDO</span></td>
+          </tr>`;
+        });
+      }
+    }
+  });
+
+  // Anunciantes perdidos
+  perdidoList.forEach(({anun,pmPrev})=>{
+    const perdidoKey='__perdido0__'+anun;
+    const isPerdidoExpanded=mExpandedAnuns0.has(perdidoKey);
+    html+=`<tr class="anun-row-header row-perdido" data-toggle-anun0="${encodeURIComponent(perdidoKey)}" style="cursor:pointer">
+      <td class="td-left"><div style="display:flex;align-items:center">
+        <span class="anun-toggle-icon">${isPerdidoExpanded?'▲':'▼'}</span>
+        <span style="font-weight:600">${anun}</span>
+        <span class="badge-perdido" style="margin-left:8px">PERDIDO</span>
+      </div></td>
+      <td colspan="5" style="font-size:11px;font-style:italic">— no aparece en el año seleccionado —</td>
+      <td class="pm-col-cur" style="color:#991b1b!important">—</td>
+      <td class="pm-col-prev" style="color:#991b1b!important">${fmtAvg(Math.round(pmPrev))}</td>
+      <td class="pm-col-delta"><span class="badge-perdido">PERDIDO</span></td>
+    </tr>`;
+
+    if(isPerdidoExpanded&&hasPrev){
+      const pRowsAnun=prevAnunRowsMap.get(anun)||[];
+      const marcaMap2=new Map();
+      pRowsAnun.forEach(r=>{
+        const m=(r[COL_MARCA]||'').trim()||'(sin marca)';
+        if(!marcaMap2.has(m)) marcaMap2.set(m,[]);
+        marcaMap2.get(m).push(r);
+      });
+      marcaMap2.forEach((pMRows,marca)=>{
+        const {pm:pPMPrev}=calcPresupuestoMedio0(pMRows);
+        const pubs2=[...new Set(pMRows.map(r=>r._pubNorm).filter(Boolean))];
+        const mCanal2=pMRows.reduce((best,r)=>(!best||r._ingreso>best._ingreso?r:best),null)?._canal||'';
+        html+=`<tr class="anun-row-sub row-perdido-sub">
+          <td class="td-left"><span style="padding-left:24px">↳ ${marca}</span><span class="badge-perdido" style="margin-left:6px;font-size:9px">PERDIDO</span></td>
+          <td style="font-size:11px">${pubs2.slice(0,3).join(', ')}${pubs2.length>3?' +':''}</td>
+          <td style="font-size:11px">${pMRows[0]?._prod||''}</td>
+          <td style="font-size:11px">${pMRows[0]?._sectorClean||''}</td>
+          <td style="font-size:11px">${(pMRows[0]?.[COL_AREA]||'').trim()}</td>
+          <td><span class="pill ${CANAL_PILL[mCanal2]||'pill-blue'}" style="font-size:9px">${mCanal2}</span></td>
+          <td style="font-size:11px">${fmtComercial(pMRows[0]?.[COL_COMERCIAL]||'')}</td>
+          <td class="pm-col-cur" style="color:#991b1b!important">—</td>
+          <td class="pm-col-prev" style="color:#991b1b!important">${fmtAvg(Math.round(pPMPrev))}</td>
+          <td class="pm-col-delta"><span class="badge-perdido">PERDIDO</span></td>
+        </tr>`;
+      });
+    }
+  });
+
+  tbody.innerHTML=html;
+}
+
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -36,7 +384,7 @@ html > body::-webkit-scrollbar-thumb:hover{background:#6b7494;}
 .top-badge{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:3px 10px;}
 .top-nav{display:flex;gap:4px;}
 .nav-btn{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;font-family:'Syne',sans-serif;cursor:pointer;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);transition:all 0.15s;white-space:nowrap;}
-.nav-btn:hover,.nav-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.nav-btn:hover{background:var(--accent);border-color:var(--accent);color:#fff;}.nav-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;border-left-width:3px!important;}
 
 /* UPLOAD */
 .upload-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 56px);gap:24px;padding:24px;}
@@ -542,6 +890,18 @@ table.main-table tbody tr.row-perdido td.pm-col-delta{background:#fee2e2!importa
 .pm-legend{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3);}
 .pm-legend-dot{width:10px;height:10px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,0.08);}
 .pill-reparo{background:#fef9ec;color:#92400e;border:1px solid #fde68a;display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;white-space:nowrap;}
+/* Vista CON 0€ — acento ámbar */
+#presupuestos-medios-card table.main-table thead th.pm-col-cur{background:#fef3c7!important;color:#92400e!important;}
+#presupuestos-medios-card table.main-table thead th.pm-col-prev{background:#fde68a!important;color:#78350f!important;}
+#presupuestos-medios-card table.main-table tbody td.pm-col-cur{background:#fffbeb!important;color:#92400e!important;}
+#presupuestos-medios-card table.main-table tbody td.pm-col-prev{background:#fef9ec!important;color:#78350f!important;}
+#presupuestos-medios-card table.main-table tbody tr:hover td.pm-col-cur{background:#fef3c7!important;}
+#presupuestos-medios-card table.main-table tbody tr:hover td.pm-col-prev{background:#fde68a!important;}
+#presupuestos-medios-card table.main-table tbody tr.anun-row-header td.pm-col-cur{background:#fef3c7!important;}
+#presupuestos-medios-card table.main-table tbody tr.anun-row-header td.pm-col-prev{background:#fde68a!important;}
+/* Leyenda con 0€ */
+#view-main .pm-legend .dot-cur{background:#fef3c7;}
+#view-main .pm-legend .dot-prev{background:#fde68a;}
 </style>
 </head>
 <body>
@@ -550,8 +910,8 @@ table.main-table tbody tr.row-perdido td.pm-col-delta{background:#fee2e2!importa
 <div class="topbar">
   <div class="brand"><span class="brand-dot"></span><span class="syne">Dashboard Publicitario</span></div>
   <div class="top-nav">
-    <button class="nav-btn active" onclick="switchView('main',this)">📊 Presupuestos Medios</button>
-    <button class="nav-btn" onclick="switchView('alertas',this)">📋 Pendientes de contactar</button>
+    <button class="nav-btn active" onclick="switchView('main',this)" style="border-left:3px solid #f59e0b">📊 PM con líneas 0€</button>
+    <button class="nav-btn" onclick="switchView('main0',this)" style="border-left:3px solid #2563eb">📊 PM sin líneas 0€</button>
   </div>
   <div id="top-badge" class="top-badge" style="display:none">—</div>
 </div>
@@ -643,48 +1003,7 @@ table.main-table tbody tr.row-perdido td.pm-col-delta{background:#fee2e2!importa
     </div>
   </div><!-- /shared-filters-wrap -->
 
-  <!-- ══════════════ VISTA PENDIENTES DE CONTACTAR ══════════════ -->
-  <div id="view-alertas" class="view">
 
-    <!-- IDs ocultos necesarios para compatibilidad con JS existente -->
-    <select id="yr-base" style="display:none"></select>
-    <select id="yr-comp" style="display:none"></select>
-    <select id="f-canal" style="display:none"><option value="all">Todos los canales</option><option value="DIGITAL">Digital</option><option value="PRINT">Print</option><option value="EVENTOS">Eventos</option></select>
-    <div id="months-row" style="display:none"></div>
-    <div id="area-chips-row" style="display:none"></div>
-    <div id="fam-chips-row" style="display:none"></div>
-    <span id="months-hint" style="display:none"></span>
-    <div style="display:none">
-      <div id="rk-pub"></div><div id="rk-area"></div><div id="rk-sector"></div><div id="rk-familia"></div>
-      <div id="w-sector-site"></div><div id="w-pm-prod"></div><div id="w-pm-prod-site"></div>
-      <div id="bca-0"></div><div id="bca-1"></div><div id="bca-2"></div><div id="bca-3"></div><div id="bca-4"></div>
-      <div id="bc-0"></div><div id="bc-1"></div><div id="bc-2"></div><div id="bc-3"></div><div id="bc-4"></div>
-      <select id="bc-pub-select"></select><span id="bc-year-hint"></span>
-      <div id="com-col-left"></div><div id="com-col-mid"></div><div id="com-col-right"></div><span id="com-hint"></span>
-      <div id="pub-digital"></div><div id="pub-print"></div><div id="pub-eventos"></div>
-      <div id="anun-panel-wrap"></div>
-    </div>
-
-    <div style="padding:20px 20px 32px">
-
-      <div id="pdc-header" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:16px;display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
-        <div style="flex:1;min-width:220px">
-          <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:4px">📋 Pendientes de contactar</div>
-          <div id="pdc-desc" style="font-size:12px;color:var(--text2);line-height:1.6">
-            Selecciona un <strong>año</strong> y unos <strong>meses</strong> en los filtros superiores para ver qué anunciantes tuviste ese periodo y aún no han contratado en el año siguiente.
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px">
-          <button onclick="exportPendientesPDF()" style="display:flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-family:'Syne',sans-serif;font-weight:700;cursor:pointer;white-space:nowrap;transition:background 0.15s" onmouseover="this.style.background='var(--accent2)'" onmouseout="this.style.background='var(--accent)'">📄 Exportar PDF</button>
-          <div id="pdc-kpis" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end"></div>
-        </div>
-      </div>
-
-      <div id="pdc-content"></div>
-
-    </div>
-
-  </div><!-- /view-alertas -->
 
 
   <!-- ══════════════ VISTA DASHBOARD GENERAL ══════════════ -->
@@ -725,7 +1044,14 @@ table.main-table tbody tr.row-perdido td.pm-col-delta{background:#fee2e2!importa
         </div>
       </div>
 
-      <!-- Presupuestos Medios -->
+      <!-- Presupuestos Medios CON 0€ -->
+      <div style="background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(245,158,11,0.02));border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius-lg);padding:12px 18px;display:flex;align-items:center;gap:12px">
+        <span style="font-size:22px">🟡</span>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#b45309">Presupuestos Medios — Con líneas 0€</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">El presupuesto medio incluye en el denominador las líneas con ingreso 0€ (salvo las que forman pareja de reparo). Si quieres excluirlas, usa la pestaña <strong>PM sin líneas 0€</strong>.</div>
+        </div>
+      </div>
       <div class="chart-card" id="presupuestos-medios-card">
         <div class="chart-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
           <span style="display:flex;align-items:center;gap:10px">
@@ -734,8 +1060,8 @@ table.main-table tbody tr.row-perdido td.pm-col-delta{background:#fee2e2!importa
           </span>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <div class="pm-legend">
-              <span class="pm-legend-dot" style="background:#dbeafe"></span><span>PM año sel.</span>
-              <span class="pm-legend-dot" style="background:#dcfce7;margin-left:8px"></span><span>PM año ant.</span>
+              <span class="pm-legend-dot" style="background:#fef3c7;border-color:#f59e0b"></span><span style="color:#92400e;font-weight:500">PM año sel.</span>
+              <span class="pm-legend-dot" style="background:#fde68a;border-color:#d97706;margin-left:8px"></span><span style="color:#78350f;font-weight:500">PM año ant.</span>
               <span class="pm-legend-dot" style="background:#f3f4f6;margin-left:8px"></span><span>Variación</span>
             </div>
           </div>
@@ -763,6 +1089,54 @@ table.main-table tbody tr.row-perdido td.pm-col-delta{background:#fee2e2!importa
     </div>
 
   </div><!-- /view-main -->
+
+  <!-- ══════════════ VISTA PM SIN LÍNEAS 0€ ══════════════ -->
+  <div id="view-main0" class="view">
+    <div class="main-view">
+      <!-- Banner informativo -->
+      <div style="background:linear-gradient(135deg,rgba(37,99,235,0.08),rgba(37,99,235,0.02));border:1px solid rgba(37,99,235,0.25);border-radius:var(--radius-lg);padding:12px 18px;display:flex;align-items:center;gap:12px">
+        <span style="font-size:22px">🔵</span>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--blue)">Presupuestos Medios — Sin líneas 0€</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">Las líneas con ingreso exactamente 0€ se excluyen <strong>antes</strong> del neteo de reparos. Útil para ver el presupuesto real por inserción efectiva. Para verlas incluidas, usa la pestaña <strong>PM con líneas 0€</strong>.</div>
+        </div>
+      </div>
+
+      <!-- Tabla PM s/0 -->
+      <div class="chart-card">
+        <div class="chart-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <span style="display:flex;align-items:center;gap:10px">
+            Presupuestos Medios <span style="font-size:10px;color:var(--blue);background:rgba(37,99,235,0.1);border-radius:5px;padding:2px 8px;font-weight:600;font-family:'DM Mono',monospace">sin 0€</span>
+            <span id="m0-tabla-count-msg" style="font-size:10px;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0"></span>
+          </span>
+          <div class="pm-legend">
+            <span class="pm-legend-dot" style="background:#dbeafe"></span><span>PM año sel.</span>
+            <span class="pm-legend-dot" style="background:#dcfce7;margin-left:8px"></span><span>PM año ant.</span>
+            <span class="pm-legend-dot" style="background:#f3f4f6;margin-left:8px"></span><span>Variación</span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="main-table" id="pm0-table">
+            <thead>
+              <tr>
+                <th class="th-left" style="min-width:220px">Anunciante / Marca / Producto</th>
+                <th>Publicación</th>
+                <th>Producto</th>
+                <th>Sector</th>
+                <th>Área</th>
+                <th>Canal</th>
+                <th>Comercial</th>
+                <th class="pm-col-cur th-sortable" onclick="sortPMTable0('pm')" id="m0-th-pm" title="PM = ingreso ÷ inserciones reales, excluyendo líneas con ingreso 0€">PM Año sel. ↕</th>
+                <th class="pm-col-prev th-sortable" onclick="sortPMTable0('pmPrev')" id="m0-th-pmprev">PM Año ant. ↕</th>
+                <th class="pm-col-delta th-sortable" onclick="sortPMTable0('delta')" id="m0-th-delta">% Var. ↕</th>
+              </tr>
+            </thead>
+            <tbody id="m0-tabla-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div><!-- /view-main0 -->
 
 
   <!-- SECTOR PUB MODAL -->
@@ -928,11 +1302,9 @@ function processArrayBuffer(buffer,filename){
     DATA.forEach(r=>{r._famLabel=familiaLabel(r);});
     document.getElementById('top-badge').style.display='';
     document.getElementById('top-badge').textContent=DATA.length.toLocaleString('es-ES')+' registros · '+filename;
-    populateAlertasFilters();
     populateMainFilters();
     document.getElementById('upload-screen').style.display='none';
     document.getElementById('app').style.display='block';
-    applyFilters();
     renderMain();
   }catch(err){
     document.getElementById('up-msg').textContent='Error al leer el archivo: '+err.message;
@@ -959,396 +1331,7 @@ function switchView(name,btn){
   document.getElementById('view-'+name).classList.add('active');
   btn.classList.add('active');
   if(typeof renderMain==='function') renderMain();
-  if(name==='alertas'&&typeof renderPendientesContactar==='function') renderPendientesContactar();
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ALERTAS — FILTROS
-// ══════════════════════════════════════════════════════════════════════════════
-let selectedMonths=new Set(),selectedFamilies=new Set(),selectedAreas=new Set(),activePub=null;
-
-function populateAlertasFilters(){
-  // Los filtros de año, mes, área y familia ya vienen de los filtros compartidos
-  // Solo actualizamos el selector de BC y arrancamos con estado vacío
-  populateBCSelector();
-  const bcSel=document.getElementById('bc-pub-select');
-  if(bcSel){const elleOpt=[...bcSel.options].find(o=>o.value==='revista::ELLE');if(elleOpt)bcSel.value=elleOpt.value;}
-  showEmptyState();
-}
-
-function populateAreaChips(){
-  const canal=document.getElementById('f-canal').value;
-  const areaSet=new Set();
-  DATA.forEach(r=>{if(canal!=='all'&&r._canal!==canal) return;if(r._area) areaSet.add(r._area);});
-  selectedAreas.forEach(a=>{if(!areaSet.has(a)) selectedAreas.delete(a);});
-  const sorted=[...areaSet].filter(Boolean).sort((a,b)=>a.localeCompare(b,'es'));
-  let html=`<span class="af-chip af-all${selectedAreas.size===0?' active':''}" onclick="toggleArea('all')">Todas</span>`;
-  sorted.forEach(area=>{
-    const active=selectedAreas.has(area)?' active':'';
-    html+=`<span class="af-chip${active}" data-area="${area.replace(/"/g,'&quot;')}" onclick="toggleArea(this)">${area}</span>`;
-  });
-  document.getElementById('area-chips-row').innerHTML=html;
-}
-
-function toggleArea(el){
-  if(el==='all'){selectedAreas.clear();}
-  else{const area=el.dataset.area;if(selectedAreas.has(area)) selectedAreas.delete(area);else selectedAreas.add(area);}
-  document.querySelectorAll('.af-chip').forEach(ch=>{
-    if(ch.classList.contains('af-all')&&ch.closest('#area-chips-row')) ch.classList.toggle('active',selectedAreas.size===0);
-    else if(ch.dataset.area!==undefined) ch.classList.toggle('active',selectedAreas.has(ch.dataset.area));
-  });
-  applyFilters();
-}
-
-function populateFamChips(){
-  const canal=document.getElementById('f-canal').value;
-  const famSet=new Set();
-  DATA.forEach(r=>{if(canal!=='all'&&r._canal!==canal) return;famSet.add(famKey(r));});
-  selectedFamilies.forEach(f=>{if(!famSet.has(f)) selectedFamilies.delete(f);});
-  const sorted=[...famSet].filter(Boolean).sort((a,b)=>a.localeCompare(b,'es'));
-  let html=`<span class="af-chip af-all${selectedFamilies.size===0?' active':''}" onclick="toggleFam('all')">Todas</span>`;
-  sorted.forEach(fam=>{
-    const active=selectedFamilies.has(fam)?' active':'';
-    html+=`<span class="af-chip${active}" data-fam="${fam.replace(/"/g,'&quot;')}" onclick="toggleFam(this)">${fam}</span>`;
-  });
-  document.getElementById('fam-chips-row').innerHTML=html;
-}
-
-function toggleFam(el){
-  if(el==='all'){selectedFamilies.clear();}
-  else{const fam=el.dataset.fam;if(selectedFamilies.has(fam)) selectedFamilies.delete(fam);else selectedFamilies.add(fam);}
-  document.querySelectorAll('#fam-chips-row .af-chip').forEach(ch=>{
-    if(ch.classList.contains('af-all')) ch.classList.toggle('active',selectedFamilies.size===0);
-    else ch.classList.toggle('active',selectedFamilies.has(ch.dataset.fam));
-  });
-  applyFilters();
-}
-
-function toggleMonth(mes){
-  if(mes==='all'){selectedMonths.clear();}
-  else{selectedMonths.has(mes)?selectedMonths.delete(mes):selectedMonths.add(mes);}
-  document.querySelectorAll('.m-chip').forEach(ch=>{
-    if(ch.classList.contains('all-chip')) ch.classList.toggle('active',selectedMonths.size===0);
-    else ch.classList.toggle('active',selectedMonths.has(ch.dataset.mes));
-  });
-  document.getElementById('months-hint').textContent=selectedMonths.size===0?'Todos seleccionados':[...selectedMonths].map(m=>MESES_SHORT[m]||m).join(', ');
-  applyFilters();
-}
-
-function onCanalChange(){populateAreaChips();populateFamChips();applyFilters();}
-
-function getRows(year){
-  // Usa los filtros compartidos del Dashboard General
-  const base=mGetChannelData(); // respeta el canal activo
-  const byYear=base.filter(r=>r._yearRaw===year);
-  return mApplyFilters(byYear);
-}
-
-function applyFilters(){
-  // Año base = año seleccionado en el filtro compartido (si es "all", no se puede comparar)
-  const yrSel=document.getElementById('m-f-year').value;
-  if(!yrSel||yrSel==='all'){showEmptyState();return;}
-  const yrBase=yrSel;
-  const yrComp=String(parseInt(yrBase)-1);
-  // Sincronizar selects ocultos por si algún código los lee directamente
-  const yb=document.getElementById('yr-base'),yc=document.getElementById('yr-comp');
-  if(yb) yb.value=yrBase; if(yc) yc.value=yrComp;
-  const base=getRows(yrBase),comp=getRows(yrComp);
-  renderRankings(base,comp);
-  renderWorst(base,comp);
-  renderComerciales(base,comp);
-  renderPublicaciones();
-  renderBC();
-  renderBCGlobal();
-  document.getElementById('anun-panel-wrap').innerHTML='';
-  activePub=null;
-  document.querySelectorAll('.pub-chip').forEach(c=>c.classList.remove('active-pub'));
-}
-
-function showEmptyState(){
-  const msg='<div class="empty-msg" style="padding:32px 14px">Selecciona un año concreto (no «Todos») en el filtro superior para ver el análisis comparativo</div>';
-  ['rk-pub','rk-area','rk-sector','rk-familia'].forEach(id=>document.getElementById(id).innerHTML=msg);
-  ['w-sector-site','w-pm-prod','w-pm-prod-site'].forEach(id=>document.getElementById(id).innerHTML=msg);
-  ['pub-digital','pub-print','pub-eventos'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='';});
-  BC_SLOTS.forEach(s=>{const el=document.getElementById(s.id);if(el)el.innerHTML='<div class="bc-empty">Selecciona año base y año comparado</div>';});
-  BC_SLOTS.forEach((_,i)=>{const el=document.getElementById('bca-'+i);if(el)el.innerHTML='<div class="bc-empty">Selecciona año base y año comparado</div>';});
-  const cg=document.getElementById('com-col-left');if(cg)cg.innerHTML='<div style="padding:24px;text-align:center;color:var(--text3);font-size:12px">Selecciona año base y año comparado para ver el análisis</div>';
-  const cgr=document.getElementById('com-col-right');if(cgr)cgr.innerHTML='';
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ALERTAS — RANKINGS
-// ══════════════════════════════════════════════════════════════════════════════
-function aggSum(rows,keyFn){const m=new Map();rows.forEach(r=>{const k=keyFn(r);if(k===null||k===undefined||k==='') return;m.set(k,(m.get(k)||0)+r._ingreso);});return m;}
-function aggMean(rows,keyFn){const m=new Map();rows.forEach(r=>{const k=keyFn(r);if(k===null||k===undefined||k==='') return;if(!m.has(k)) m.set(k,{sum:0,count:0});const g=m.get(k);g.sum+=r._ingreso;g.count++;});return m;}
-function cleanSectorName(s){return s.replace(/^\d+\s*\*\s*/,'').trim();}
-
-function renderRankings(base,comp){
-  const canalSel=document.getElementById('f-canal').value;
-  renderRankingCard('rk-pub',base,comp,r=>r._pub,null,canalSel);
-  renderRankingCard('rk-area',base,comp,r=>r._area,null,canalSel);
-  renderRankingCard('rk-sector',base,comp,r=>r._sector,null,canalSel);
-  renderRankingCard('rk-familia',base,comp,r=>r._fam,null,canalSel);
-}
-
-function renderRankingCard(elId,base,comp,keyFn,subKeyFn,canalSel){
-  const bMap=aggSum(base,keyFn),cMap=aggSum(comp,keyFn);
-  let bSubMap=null;
-  if(subKeyFn){bSubMap=new Map();base.forEach(r=>{const k=keyFn(r),sub=subKeyFn(r);if(!k||!sub) return;if(!bSubMap.has(k)) bSubMap.set(k,new Map());const sm=bSubMap.get(k);sm.set(sub,(sm.get(sub)||0)+r._ingreso);});}
-  const totalBase=base.reduce((s,r)=>s+r._ingreso,0);
-  const totalComp=comp.reduce((s,r)=>s+r._ingreso,0);
-  const tPct=calcPct(totalBase,totalComp);
-  const tClass=pctClass(tPct,false,false);
-  const allKeys=new Set([...bMap.keys(),...cMap.keys()]);
-  let items=[];
-  allKeys.forEach(k=>{
-    if(!k) return;
-    const bv=bMap.get(k)||0,cv=cMap.get(k)||0;
-    const isLost=cv!==0&&bv===0,isNew=bv!==0&&cv===0;
-    const p=(!isLost&&!isNew)?calcPct(bv,cv):null;
-    const diff=bv-cv;
-    let topSub='';
-    if(bSubMap&&bSubMap.has(k)){const sm=bSubMap.get(k);topSub=[...sm.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0]||'';}
-    let eventoProd='';
-    if(elId==='rk-pub'&&canalSel==='EVENTOS'){const prodCount=new Map();base.filter(r=>keyFn(r)===k).forEach(r=>{if(r._prod) prodCount.set(r._prod,(prodCount.get(r._prod)||0)+1);});if(prodCount.size) eventoProd=[...prodCount.entries()].sort((a,b)=>b[1]-a[1])[0][0];}
-    items.push({k,bv,cv,p,isLost,isNew,diff,topSub,eventoProd});
-  });
-  items.sort((a,b)=>{if(a.isNew&&!b.isNew) return 1;if(!a.isNew&&b.isNew) return -1;return a.diff-b.diff;});
-  let html=`<div class="rk-total-row"><span class="rk-total-label">TOTAL</span><span class="rk-total-val">${fmt(totalBase)}</span><span class="rk-total-pct ${tClass}">${tPct!==null?fmtPct(tPct):'—'}</span></div>`;
-  items.forEach((it,i)=>{
-    const pc=pctClass(it.p,it.isLost,it.isNew);
-    const badge=it.isLost?'<span class="badge-lost">PERDIDO</span>':it.isNew?'<span class="badge-new">NUEVO</span>':'';
-    const pText=it.isLost||it.isNew?'':(it.p!==null?fmtPct(it.p):'—');
-    const diff=it.diff;
-    const diffText=(it.isLost||it.isNew||it.cv===0)?'':`<span class="rk-diff ${diff>=0?'pos':'neg'}">(${diff>=0?'+':''}${fmt(diff)})</span>`;
-    const displayName=elId==='rk-sector'?cleanSectorName(it.k):it.k;
-    const subLabel=(it.eventoProd?`<span class="rk-sub">${it.eventoProd}</span>`:it.topSub?`<span class="rk-sub">${it.topSub}</span>`:'');
-    html+=`<div class="ranking-row"><span class="rk-pos">${i+1}</span><span class="rk-name" title="${it.k}">${displayName}${subLabel}</span>${badge}<span class="rk-val">${fmt(it.bv)}</span>${diffText}<span class="rk-pct ${pc}">${pText}</span></div>`;
-  });
-  document.getElementById(elId).innerHTML=html||'<div class="empty-msg">Sin datos</div>';
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ALERTAS — WORST
-// ══════════════════════════════════════════════════════════════════════════════
-let _popData=[];
-function renderWorst(base,comp){
-  renderWorstSectorSite('w-sector-site',base,comp);
-  renderWorstSectorArea('w-pm-prod',base,comp);
-  renderWorstPM('w-pm-prod-site',base,comp,r=>`${r._prod}|||${r._pub}`,it=>{const[a,b]=it.k.split('|||');return{name:a,sub:b};});
-}
-function renderWorstSectorSite(elId,base,comp){
-  _popData=[];
-  const keyFn=r=>`${r._pub}|||${r._sector}`;
-  const bMap=aggSum(base,keyFn),cMap=aggSum(comp,keyFn);
-  const allKeys=new Set([...bMap.keys(),...cMap.keys()]);
-  let items=[];
-  allKeys.forEach(k=>{if(!k) return;const[pub,sector]=k.split('|||');if(!pub||!sector) return;const bv=bMap.get(k)||0,cv=cMap.get(k)||0,diff=bv-cv,p=cv!==0?calcPct(bv,cv):null;items.push({pub,sector:cleanSectorName(sector),bv,cv,diff,p});});
-  items=items.filter(it=>it.bv!==0||it.cv!==0);
-  items.sort((a,b)=>a.diff-b.diff);
-  const worst=items.slice(0,30);
-  const maxAbs=Math.max(...worst.map(it=>Math.abs(it.diff)),1);
-  let html='';
-  worst.forEach((it,i)=>{
-    const barW=Math.min(100,(Math.abs(it.diff)/maxAbs)*100);
-    const diffCol=it.diff>=0?`<span class="w-val-pos">${fmt(it.diff)}</span>`:`<span class="w-val-neg">${fmt(it.diff)}</span>`;
-    const pctCol=it.p!==null?`<span class="w-pct ${it.p>=0?'w-pos':'w-neg'}">${fmtPct(it.p)}</span>`:`<span class="w-pct" style="color:var(--text3)">—</span>`;
-    const idx_s=_popData.push({type:'pub',dim1:it.pub,sector:it.sector})-1;
-    html+=`<div class="worst-row2" style="cursor:pointer" data-popidx="${idx_s}" onmouseenter="onRowEnter(event,${idx_s})" onmouseleave="onRowLeave(event)" ontouchend="onRowTap(event,${idx_s})"><span class="w-num">${i+1}</span><div class="w-info"><div class="w-name">${it.sector}</div><div class="w-sub">${it.pub}</div><div class="w-bar-wrap"><div class="w-bar ${it.diff>=0?'w-bar-pos':''}" style="width:${barW}%"></div></div></div>${diffCol}${pctCol}</div>`;
-  });
-  document.getElementById(elId).innerHTML=html||'<div class="empty-msg">Sin datos comparables</div>';
-}
-const AREA_MAP={'BRAND EXPERIENCE':'Madrid','CLIENT EXPERIENCE LIFESTYLE':'Madrid','CLIENT EXPERIENCE LUJO':'Madrid','CLIENT EXPERIENCE BARCELONA':'Barcelona','INTERNACIONAL':'Internacional','PROGRAMÁTICA':'Programática'};
-function mapArea(raw){return AREA_MAP[raw.trim().toUpperCase()]||AREA_MAP[raw.trim()]||raw.trim();}
-function renderWorstSectorArea(elId,base,comp){
-  const keyFn=r=>`${mapArea(r._area)}|||${r._sector}`;
-  const bMap=aggSum(base,keyFn),cMap=aggSum(comp,keyFn);
-  const allKeys=new Set([...bMap.keys(),...cMap.keys()]);
-  let items=[];
-  allKeys.forEach(k=>{if(!k) return;const[area,sector]=k.split('|||');if(!area||!sector) return;const bv=bMap.get(k)||0,cv=cMap.get(k)||0,diff=bv-cv,p=cv!==0?calcPct(bv,cv):null;items.push({area,sector:cleanSectorName(sector),bv,cv,diff,p});});
-  items=items.filter(it=>it.bv!==0||it.cv!==0);
-  items.sort((a,b)=>a.diff-b.diff);
-  const worst=items.slice(0,30);
-  const maxAbs=Math.max(...worst.map(it=>Math.abs(it.diff)),1);
-  let html='';
-  worst.forEach((it,i)=>{
-    const barW=Math.min(100,(Math.abs(it.diff)/maxAbs)*100);
-    const diffCol=it.diff>=0?`<span class="w-val-pos">${fmt(it.diff)}</span>`:`<span class="w-val-neg">${fmt(it.diff)}</span>`;
-    const pctCol=it.p!==null?`<span class="w-pct ${it.p>=0?'w-pos':'w-neg'}">${fmtPct(it.p)}</span>`:`<span class="w-pct" style="color:var(--text3)">—</span>`;
-    const idx_a=_popData.push({type:'area',dim1:it.area,sector:it.sector})-1;
-    html+=`<div class="worst-row2" style="cursor:pointer" data-popidx="${idx_a}" onmouseenter="onRowEnter(event,${idx_a})" onmouseleave="onRowLeave(event)" ontouchend="onRowTap(event,${idx_a})"><span class="w-num">${i+1}</span><div class="w-info"><div class="w-name">${it.sector}</div><div class="w-sub">${it.area}</div><div class="w-bar-wrap"><div class="w-bar ${it.diff>=0?'w-bar-pos':''}" style="width:${barW}%"></div></div></div>${diffCol}${pctCol}</div>`;
-  });
-  document.getElementById(elId).innerHTML=html||'<div class="empty-msg">Sin datos comparables</div>';
-}
-function renderWorstPM(elId,base,comp,keyFn,labelFn){
-  const bMap=aggMean(base,keyFn),cMap=aggMean(comp,keyFn);
-  const allKeys=new Set([...bMap.keys(),...cMap.keys()]);
-  let items=[];
-  allKeys.forEach(k=>{if(!k) return;const bg=bMap.get(k),cg=cMap.get(k);if(!bg||!cg) return;const bPM=bg.sum/bg.count,cPM=cg.sum/cg.count,diff=bPM-cPM,p=cPM!==0?calcPct(bPM,cPM):null;if(p===null) return;const{name,sub}=labelFn({k});items.push({name,sub,bPM,cPM,diff,p});});
-  items.sort((a,b)=>a.diff-b.diff);
-  const worst=items.slice(0,30);
-  const maxAbs=Math.max(...worst.map(it=>Math.abs(it.diff)),1);
-  let html='';
-  worst.forEach((it,i)=>{
-    const barW=Math.min(100,(Math.abs(it.diff)/maxAbs)*100);
-    const valCol=`<span class="w-val-neg">${fmt(it.bPM)} <span class="w-vs">vs ${fmt(it.cPM)}</span></span>`;
-    const pctCol=`<span class="w-pct ${it.p>=0?'w-pos':'w-neg'}">${fmtPct(it.p)}</span>`;
-    html+=`<div class="worst-row2"><span class="w-num">${i+1}</span><div class="w-info"><div class="w-name">${it.name}</div>${it.sub?`<div class="w-sub">${it.sub}</div>`:''}<div class="w-bar-wrap"><div class="w-bar ${it.diff>=0?'w-bar-pos':''}" style="width:${barW}%"></div></div></div>${valCol}${pctCol}</div>`;
-  });
-  document.getElementById(elId).innerHTML=html||'<div class="empty-msg">Sin datos comparables</div>';
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ALERTAS — BC (Branded Content)
-// ══════════════════════════════════════════════════════════════════════════════
-const BC_SLOTS=[
-  {id:'bc-0',label:'Branded Content',icon:'✍️',type:'prod',value:'Branded Content',showProduct:false},
-  {id:'bc-1',label:'BC Video',icon:'🎬',type:'prod',value:'Branded Content video',showProduct:false},
-  {id:'bc-2',label:'Social Networks',icon:'📱',type:'fam',value:'Social Networks',showProduct:true},
-  {id:'bc-3',label:'Página Branded',icon:'📄',type:'prod',value:'PAGINA BRANDED',showProduct:false},
-  {id:'bc-4',label:'Doble Página Branded',icon:'📰',type:'prod',value:'DOBLE PAGINA BRANDED',showProduct:false},
-];
-const BC_PUB_MAP=[
-  {digital:'www.caranddriver.com/es',canon:'CAR & DRIVER'},{digital:'www.cosmopolitan.com/es',canon:'COSMOPOLITAN'},
-  {digital:'www.diezminutos.es',canon:'DIEZ MINUTOS'},{digital:'www.elle.com/es',canon:'ELLE'},
-  {digital:'www.elledecor.com/es',canon:'ELLE DECORATION'},{digital:'www.esquire.com/es',canon:'ESQUIRE'},
-  {digital:'www.fotogramas.es',canon:'FOTOGRAMAS'},{digital:'www.harpersbazaar.com/es',canon:"HARPER'S BAZAAR"},
-  {digital:'www.menshealth.com/es',canon:"MEN'S HEALTH"},{digital:'www.micasarevista.com',canon:'MI CASA REVISTA'},
-  {digital:'www.nuevo-estilo.es',canon:'NUEVO ESTILO'},{digital:'www.runnersworld.com/es',canon:"RUNNER'S WORLD"},
-  {digital:'www.womenshealthmag.com/es',canon:"WOMEN'S HEALTH"},
-];
-const BC_PRINT_CANON={'CAR & DRIVER':'CAR & DRIVER','COSMOPOLITAN':'COSMOPOLITAN','DIEZ MINUTOS':'DIEZ MINUTOS','ELLE':'ELLE','ELLE DECORATION':'ELLE DECORATION','ELLE GOURMET':'ELLE GOURMET','ELLE TRAVEL':'ELLE TRAVEL','ESQUIRE':'ESQUIRE','FOTOGRAMAS & VIDEO':'FOTOGRAMAS','FOTOGRAMAS':'FOTOGRAMAS',"HARPER'S BAZAAR":"HARPER'S BAZAAR","HARPERS BAZAAR":"HARPER'S BAZAAR","MEN'S HEALTH":"MEN'S HEALTH","MENS HEALTH":"MEN'S HEALTH",'NUEVO ESTILO':'NUEVO ESTILO',"RUNNER'S WORLD":"RUNNER'S WORLD","RUNNERS WORLD":"RUNNER'S WORLD","WOMEN'S HEALTH":"WOMEN'S HEALTH","WOMENS HEALTH":"WOMEN'S HEALTH"};
-function normDigitalPub(raw){return raw.trim().replace(/^https?:\/\//i,'').replace(/\/+$/,'').toLowerCase();}
-function canonPub(r){
-  if(r._canal==='DIGITAL'){const norm=normDigitalPub(r._pub);const entry=BC_PUB_MAP.find(e=>norm===e.digital||norm.startsWith(e.digital));return entry?entry.canon:null;}
-  if(r._canal==='PRINT'){const up=r._pub.trim().toUpperCase();return BC_PRINT_CANON[up]||null;}
-  return null;
-}
-function populateBCSelector(){
-  const sel=document.getElementById('bc-pub-select');if(!sel) return;
-  const canonRevista=new Set(),canonEvento=new Set();
-  DATA.forEach(r=>{if(r._fam==='Eventos'){if(r._pub) canonEvento.add(r._pub.trim());return;}const c=canonPub(r);if(c) canonRevista.add(c);});
-  const prevVal=sel.value;
-  sel.innerHTML='<option value="">— Selecciona publicación —</option>';
-  const grpRevista=document.createElement('optgroup');grpRevista.label='📰 Revista + Web';
-  [...canonRevista].sort().forEach(name=>{const opt=document.createElement('option');opt.value='revista::'+name;opt.textContent=name;grpRevista.appendChild(opt);});
-  if(grpRevista.children.length) sel.appendChild(grpRevista);
-  const grpEvento=document.createElement('optgroup');grpEvento.label='🎪 Eventos';
-  [...canonEvento].sort().forEach(name=>{const opt=document.createElement('option');opt.value='evento::'+name;opt.textContent=name;opt.style.color='#7c3aed';grpEvento.appendChild(opt);});
-  if(grpEvento.children.length) sel.appendChild(grpEvento);
-  if(prevVal){sel.value=prevVal;if(!sel.value) sel.value='';}
-}
-function renderBCGlobal(){
-  const yrBase=document.getElementById('m-f-year').value==='all'?null:document.getElementById('m-f-year').value;
-  const NO_DATA='<div class="bc-empty">Sin datos para este filtro</div>';
-  const WAIT='<div class="bc-empty">Selecciona un año concreto en el filtro superior para ver datos</div>';
-  if(!yrBase){BC_SLOTS.forEach((_,i)=>{const el=document.getElementById('bca-'+i);if(el) el.innerHTML=WAIT;});return;}
-  const baseRows=mApplyFilters(mGetChannelData().filter(r=>r._yearRaw===yrBase&&r._fam!=='Eventos'));
-  BC_SLOTS.forEach((s,i)=>{
-    const el=document.getElementById('bca-'+i);if(!el) return;
-    const slotRows=baseRows.filter(r=>s.type==='prod'?r._prod===s.value:r._fam===s.value).filter(r=>r._ingreso>0);
-    if(!slotRows.length){el.innerHTML=NO_DATA;return;}
-    const sorted=[...slotRows].sort((a,b)=>a._ingreso-b._ingreso).slice(0,30);
-    el.innerHTML=sorted.map((r,idx)=>{
-      const marca=r._marca||r._anun||'(sin marca)',anun=r._anun||'',pub=r._pubClean||r._pub||'',prod=r._prod||'',diferente=anun&&anun!==marca;
-      let infoHtml;
-      if(s.showProduct){const anunInline=diferente?` <span style="color:var(--text2);font-size:9px;font-style:italic">(${esc(anun)})</span>`:'';const subLine=[pub,prod].filter(Boolean).join(' · ');infoHtml=`<div class="bc-marca">${esc(marca)}${anunInline}</div>`+(subLine?`<div class="bc-anun">${esc(subLine)}</div>`:'');}
-      else{const marcaLine=pub?`${esc(marca)} <span style="color:var(--text3);font-size:9px">(${esc(pub)})</span>`:esc(marca);const anunBelow=diferente?`<div class="bc-anun">(${esc(anun)})</div>`:'';infoHtml=`<div class="bc-marca">${marcaLine}</div>${anunBelow}`;}
-      return `<div class="bc-row"><span class="bc-pos">${idx+1}</span><div class="bc-info">${infoHtml}</div><span class="bc-val">${fmt(r._ingreso)}</span></div>`;
-    }).join('');
-  });
-}
-function renderBC(){
-  const sel=document.getElementById('bc-pub-select'),val=sel?sel.value:'';
-  const hint=document.getElementById('bc-year-hint'),yrBase=document.getElementById('m-f-year').value==='all'?'':document.getElementById('m-f-year').value;
-  if(hint) hint.textContent=yrBase?'Año base: '+yrBase:'';
-  const EMPTY='<div class="bc-empty">Selecciona publicación</div>',NO_DATA='<div class="bc-empty">Sin datos para este filtro</div>';
-  if(!val||!yrBase){BC_SLOTS.forEach(s=>{const el=document.getElementById(s.id);if(el) el.innerHTML=EMPTY;});return;}
-  const[mode,targetCanon]=val.split('::');
-  const baseRows=mApplyFilters(mGetChannelData()).filter(r=>{if(r._yearRaw!==yrBase) return false;if(mode==='evento'){return r._fam==='Eventos'&&r._pub.trim()===targetCanon;}if(r._fam==='Eventos') return false;return canonPub(r)===targetCanon;});
-  BC_SLOTS.forEach(s=>{
-    const el=document.getElementById(s.id);if(!el) return;
-    const slotRows=baseRows.filter(r=>s.type==='prod'?r._prod===s.value:r._fam===s.value);
-    if(!slotRows.length){el.innerHTML=NO_DATA;return;}
-    const sorted=[...slotRows].sort((a,b)=>a._ingreso-b._ingreso).slice(0,30);
-    el.innerHTML=sorted.map((r,i)=>{
-      const marca=r._marca||r._anun||'(sin marca)',anun=r._anun||'',diferente=anun&&anun!==marca;
-      let infoHtml;
-      if(s.showProduct){const anunInline=diferente?` <span style="color:var(--text2);font-size:9px;font-style:italic">(${esc(anun)})</span>`:'';const prodLine=r._prod?`<div class="bc-anun" style="color:var(--accent);opacity:0.8">${esc(r._prod)}</div>`:'';infoHtml=`<div class="bc-marca">${esc(marca)}${anunInline}</div>${prodLine}`;}
-      else{const anunBelow=diferente?`<div class="bc-anun">(${esc(anun)})</div>`:'';infoHtml=`<div class="bc-marca">${esc(marca)}</div>${anunBelow}`;}
-      return `<div class="bc-row"><span class="bc-pos">${i+1}</span><div class="bc-info">${infoHtml}</div><span class="bc-val">${fmt(r._ingreso)}</span></div>`;
-    }).join('');
-  });
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ALERTAS — COMERCIALES
-// ══════════════════════════════════════════════════════════════════════════════
-function renderComerciales(base,comp){
-  const leftEl=document.getElementById('com-col-left'),midEl=document.getElementById('com-col-mid'),rightEl=document.getElementById('com-col-right'),hint=document.getElementById('com-hint');
-  if(!leftEl||!rightEl) return;
-  const EMPTY='<div style="padding:24px;text-align:center;color:var(--text3);font-size:12px">Sin datos de comerciales</div>';
-  const bMap=new Map(),cMap=new Map();
-  base.forEach(r=>{if(!r._comercial) return;bMap.set(r._comercial,(bMap.get(r._comercial)||0)+1);});
-  comp.forEach(r=>{if(!r._comercial) return;cMap.set(r._comercial,(cMap.get(r._comercial)||0)+1);});
-  const EXCLUIDOS=new Set(['PAULA GUADALUPE DEVOTO','MARCOS MARTIN MOYANO SERRANO','BARCELONA']);
-  const allComs=new Set([...bMap.keys(),...cMap.keys()].filter(c=>c&&!EXCLUIDOS.has(c.trim().toUpperCase())));
-  if(!allComs.size){leftEl.innerHTML=EMPTY;if(midEl) midEl.innerHTML='';rightEl.innerHTML='';return;}
-  const items=[...allComs].map(c=>{const b=bMap.get(c)||0,cp=cMap.get(c)||0,diff=b-cp,pct=cp>0?(diff/cp)*100:null;return{name:c.trim(),b,cp,diff,pct};}).sort((a,b)=>{if(a.pct===null&&b.pct===null) return 0;if(a.pct===null) return 1;if(b.pct===null) return -1;return a.pct-b.pct;});
-  if(hint) hint.textContent=items.length+' comerciales · ordenado por variación ↑';
-  const buildTable=rows=>{
-    const rowsHtml=rows.map(it=>{const pctStr=it.pct!==null?(it.pct>=0?'+':'')+it.pct.toFixed(1)+'%':(it.cp===0?'Nuevo':'—');const pctCls=it.pct===null?(it.cp===0?'pos':'zero-c'):(it.pct<0?'neg':it.pct>0?'pos':'zero-c');const diffStr=it.diff!==0?(it.diff>0?'+':'')+it.diff:'=';return `<tr><td class="com-td-name">${esc(it.name)}</td><td class="com-td-num">${it.b}</td><td class="com-td-num">${it.cp}</td><td class="com-td-diff">${esc(diffStr)}</td><td class="com-td-pct ${pctCls}">${esc(pctStr)}</td></tr>`;}).join('');
-    return `<table class="com-table"><thead><tr><th>Comercial</th><th class="num">Este año</th><th class="num">Año ant.</th><th class="num">Dif.</th><th class="num">%</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
-  };
-  const third=Math.ceil(items.length/3),second=third+Math.ceil((items.length-third)/2);
-  leftEl.innerHTML=buildTable(items.slice(0,third));
-  if(midEl) midEl.innerHTML=buildTable(items.slice(third,second));
-  rightEl.innerHTML=buildTable(items.slice(second));
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ALERTAS — PUBLICACIONES
-// ══════════════════════════════════════════════════════════════════════════════
-function renderPublicaciones(){
-  // Usa datos filtrados por los filtros compartidos (año base)
-  const yrBase=document.getElementById('m-f-year').value;
-  const sourceRows=yrBase&&yrBase!=='all'?getRows(yrBase):mApplyFilters(mGetChannelData());
-  const pubsByCanal=new Map();
-  sourceRows.forEach(r=>{if(!pubsByCanal.has(r._canal)) pubsByCanal.set(r._canal,new Map());pubsByCanal.get(r._canal).set(r._pub,r._pubClean||r._pub);});
-  ['DIGITAL','PRINT','EVENTOS'].forEach(canal=>{
-    const el=document.getElementById('pub-'+canal.toLowerCase());
-    const map=pubsByCanal.get(canal)||new Map();
-    const sorted=[...map.keys()].sort((a,b)=>{const na=map.get(a)||a,nb=map.get(b)||b;return na.localeCompare(nb,'es');});
-    if(!sorted.length){el.innerHTML='<div class="empty-msg" style="font-size:11px">Sin datos</div>';return;}
-    el.innerHTML=sorted.map(p=>`<span class="pub-chip" data-pub="${p.replace(/"/g,'&quot;')}" data-canal="${canal}" onclick="togglePub(this)">${map.get(p)||p}</span>`).join('');
-  });
-}
-function togglePub(el){
-  const pub=el.dataset.pub,canal=el.dataset.canal;
-  if(activePub===pub){activePub=null;document.querySelectorAll('.pub-chip').forEach(c=>c.classList.remove('active-pub'));document.getElementById('anun-panel-wrap').innerHTML='';return;}
-  document.querySelectorAll('.pub-chip').forEach(c=>c.classList.remove('active-pub'));
-  el.classList.add('active-pub');activePub=pub;renderAnunPanel(pub,canal);
-}
-function closeAnunPanel(){activePub=null;document.querySelectorAll('.pub-chip').forEach(c=>c.classList.remove('active-pub'));document.getElementById('anun-panel-wrap').innerHTML='';}
-function renderAnunPanel(pub,canal){
-  const yrSel=document.getElementById('m-f-year').value;
-  if(!yrSel||yrSel==='all') return;
-  const yrBase=yrSel,yrComp=String(parseInt(yrBase)-1);
-  const baseRows=getRows(yrBase).filter(r=>r._pub===pub&&r._canal===canal);
-  const compRows=getRows(yrComp).filter(r=>r._pub===pub&&r._canal===canal);
-  const bMap=aggSum(baseRows,r=>r._anun),cMap=aggSum(compRows,r=>r._anun);
-  function prodMap(rows){const m=new Map();rows.forEach(r=>{if(!r._anun) return;if(!m.has(r._anun)) m.set(r._anun,new Set());if(r._prod) m.get(r._anun).add(r._prod);});return m;}
-  const bProds=prodMap(baseRows),cProds=prodMap(compRows);
-  let perdidos=[];
-  cMap.forEach((cv,k)=>{if(k&&cv>0&&(!bMap.has(k)||bMap.get(k)===0)){const prods=[...(cProds.get(k)||[])].join(', ');perdidos.push({name:k,cv,prods});}});
-  perdidos.sort((a,b)=>b.cv-a.cv);perdidos=perdidos.slice(0,30);
-  let peores=[];
-  bMap.forEach((bv,k)=>{if(!k) return;const cv=cMap.get(k)||0;if(cv>0&&bv<cv){const p=calcPct(bv,cv),diff=bv-cv,prods=[...(bProds.get(k)||[])].join(', ');peores.push({name:k,bv,cv,p,diff,prods});}});
-  peores.sort((a,b)=>a.diff-b.diff);peores=peores.slice(0,30);
-  const tagMap={DIGITAL:'Web',PRINT:'Revista',EVENTOS:'Eventos'},tag=tagMap[canal]||canal;
-  const wrap=document.getElementById('anun-panel-wrap');
-  wrap.innerHTML=`<div class="anun-panel"><div class="anun-panel-header"><span class="anun-panel-title syne">${pub} <span style="color:var(--text3);font-size:12px;font-weight:400;margin-left:6px">(${tag}) · ${yrBase} vs ${yrComp}</span></span><button class="anun-close" onclick="closeAnunPanel()">✕</button></div><div class="anun-cols"><div class="anun-col"><div class="anun-col-header"><span class="anun-col-title" style="color:var(--orange)">🔶 Anunciantes perdidos</span><span class="anun-col-count">${perdidos.length} anunciantes</span></div><div class="anun-col-subheader"><span class="anun-sh-name">Anunciante · Productos</span><span class="anun-sh-val">Pérdida</span></div><div class="anun-list">${perdidos.length?perdidos.map((it,i)=>`<div class="anun-row"><span class="a-pos">${i+1}</span><div class="a-info"><span class="a-name" title="${it.name}">${it.name}</span>${it.prods?`<span class="a-prods">${it.prods}</span>`:''}</div><span class="a-badge-lost">${yrComp}</span><span class="a-val">${fmt(it.cv)}</span></div>`).join(''):'<div class="empty-msg">Ninguno perdido 👍</div>'}</div></div><div class="anun-col"><div class="anun-col-header"><span class="anun-col-title" style="color:var(--red)">🔴 Peor comportamiento</span><span class="anun-col-count">${peores.length} anunciantes</span></div><div class="anun-col-subheader"><span class="anun-sh-name">Anunciante · Productos</span><span class="anun-sh-val">Este año · (pérdida)</span><span class="anun-sh-pct">%</span></div><div class="anun-list">${peores.length?peores.map((it,i)=>`<div class="anun-row"><span class="a-pos">${i+1}</span><div class="a-info"><span class="a-name" title="${it.name}">${it.name}</span>${it.prods?`<span class="a-prods">${it.prods}</span>`:''}</div><span class="a-val">${fmt(it.bv)} <span class="a-diff">(${fmt(it.diff)})</span></span><span class="a-pct">${fmtPct(it.p)}</span></div>`).join(''):'<div class="empty-msg">Sin caídas 👍</div>'}</div></div></div></div>`;
-  setTimeout(()=>wrap.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
+  if(name==='main0'&&typeof renderTable0==='function') renderTable0();
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1575,13 +1558,9 @@ function renderMain(){
   mRenderTable(filt,yr);
   updateTabCounts();
   // Sincronizar Alertas con los filtros compartidos
-  if(document.getElementById('view-alertas').classList.contains('active')||true){
-    applyFilters();
-  }
   // Actualizar bloque Publicaciones por Área
   if(typeof renderAreaPub === 'function') renderAreaPub();
   // Actualizar Pendientes si está activo
-  if(document.getElementById('view-alertas').classList.contains('active')&&typeof renderPendientesContactar==='function') renderPendientesContactar();
 }
 
 function mGroupBy(data,keyFn,valFn){const m=new Map();data.forEach(r=>{const k=keyFn(r);m.set(k,(m.get(k)||0)+valFn(r));});return[...m.entries()].map(([k,v])=>({k,v})).sort((a,b)=>b.v-a.v);}
@@ -2442,9 +2421,20 @@ function mRenderTable(data, yearSel){
         prevMarcaRowsMap.forEach((pMRows, marca)=>{
           if(curMarcas.has(marca)) return;
           const {pm:pPMPrev} = calcPresupuestoMedio(pMRows);
+          const pPubs=[...new Set(pMRows.map(r=>r._pubClean||r._pubNorm||r._pub||'').filter(Boolean))].slice(0,3).join(', ');
+          const pProds=[...new Set(pMRows.map(r=>r._prod||'').filter(Boolean))].slice(0,3).join(', ');
+          const pSector=pMRows[0]?._sectorClean||'';
+          const pArea=(pMRows[0]?.[COL_AREA]||'').trim();
+          const pCanal=pMRows.reduce((best,r)=>(!best||r._ingreso>best._ingreso?r:best),null)?._canal||'';
+          const pCom=fmtComercial(pMRows[0]?.[COL_COMERCIAL]||'');
           html+=`<tr class="anun-row-sub row-perdido-sub">
             <td class="td-left"><span style="padding-left:24px">↳ ${marca}</span><span class="badge-perdido" style="margin-left:6px">PERDIDO</span></td>
-            <td colspan="5" style="font-size:11px">— no aparece este año —</td>
+            <td style="font-size:11px;color:#991b1b">${pPubs||'—'}</td>
+            <td style="font-size:11px;color:#991b1b">${pProds||'—'}</td>
+            <td style="font-size:11px;color:#991b1b">${pSector||'—'}</td>
+            <td style="font-size:11px;color:#991b1b">${pArea||'—'}</td>
+            <td><span class="pill ${CANAL_PILL[pCanal]||'pill-blue'}" style="font-size:9px">${pCanal}</span></td>
+            <td style="font-size:11px;color:#991b1b">${pCom||'—'}</td>
             <td class="pm-col-cur" style="color:#991b1b!important">—</td>
             <td class="pm-col-prev" style="color:#991b1b!important">${fmtAvg(Math.round(pPMPrev))}</td>
             <td class="pm-col-delta"><span class="badge-perdido">PERDIDO</span></td>
@@ -2630,617 +2620,6 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.getElement
 
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PENDIENTES DE CONTACTAR
-// Muestra anunciantes que tuvieron ingresos en el año/meses seleccionados
-// pero que NO tienen ninguna fila en el año siguiente (cualquier mes).
-// Agrupado por publicación, ordenado por ingreso del año de referencia desc.
-// ══════════════════════════════════════════════════════════════════════════════
-function renderPendientesContactar(){
-  const contentEl = document.getElementById('pdc-content');
-  const descEl    = document.getElementById('pdc-desc');
-  const kpisEl    = document.getElementById('pdc-kpis');
-  if(!contentEl) return;
-
-  const yr = document.getElementById('m-f-year').value;
-
-  // Necesitamos un año concreto para poder comparar
-  if(!yr || yr === 'all'){
-    descEl.innerHTML = 'Selecciona un <strong>año concreto</strong> (no «Todos») y opcionalmente unos <strong>meses</strong> para ver los pendientes de ese periodo.';
-    kpisEl.innerHTML = '';
-    contentEl.innerHTML = '';
-    return;
-  }
-
-  const nextYear = String(parseInt(yr) + 1);
-
-  // Filas del año seleccionado con todos los filtros activos (canal, mes, área, sector…)
-  const refRows = mGetFiltered();
-
-  if(!refRows.length){
-    descEl.innerHTML = `Sin datos para <strong>${yr}</strong> con los filtros actuales.`;
-    kpisEl.innerHTML = '';
-    contentEl.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text3);font-size:13px">Sin datos para mostrar.</div>';
-    return;
-  }
-
-  // Anunciantes que SÍ han aparecido en nextYear (cualquier mes, sin filtros de mes/sector/etc.)
-  const nextYearRows = DATA.filter(r => r._yearRaw === nextYear);
-  const nextAnuns = new Set(nextYearRows.map(r => (r[COL_ANUN]||'').trim()).filter(Boolean));
-
-  // De las filas de referencia, quedarnos con los que NO están en nextYear
-  const pendRows = refRows.filter(r => {
-    const anun = (r[COL_ANUN]||'').trim();
-    return anun && !nextAnuns.has(anun);
-  });
-
-  // Calcular meses del filtro activo para descripción
-  const mesesSel = mGetSelected('mes');
-  const mesesLabel = mesesSel.includes('all')
-    ? 'todos los meses'
-    : mesesSel.map(m => MESES_SHORT[m]||m).join(', ');
-
-  const totalRef      = refRows.reduce((s,r)=>s+r._ingreso,0);
-  const totalPend     = pendRows.reduce((s,r)=>s+r._ingreso,0);
-  const anunsPend     = new Set(pendRows.map(r=>(r[COL_ANUN]||'').trim())).size;
-  const anunsTotRef   = new Set(refRows.map(r=>(r[COL_ANUN]||'').trim())).size;
-  const pctAnuns      = anunsTotRef > 0 ? Math.round(anunsPend/anunsTotRef*100) : 0;
-
-  descEl.innerHTML = `Anunciantes que tuviste en <strong>${yr}</strong> (${mesesLabel}) y que <strong>no han contratado nada en ${nextYear}</strong>. Se excluyen automáticamente los que ya han aparecido en ${nextYear} en cualquier mes.`;
-
-  // KPIs
-  kpisEl.innerHTML = [
-    {label:'Pendientes',val:anunsPend+' anunciantes',color:'var(--red)'},
-    {label:'Ingreso en '+yr,val:fmtFull(totalPend),color:'var(--accent)'},
-    {label:'% anunciantes sin cerrar',val:pctAnuns+'%',color:'var(--orange)'},
-    {label:'Año siguiente',val:nextYear,color:'var(--text3)'},
-  ].map(k=>`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;min-width:120px">
-    <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:${k.color};font-weight:600">${k.label}</div>
-    <div style="font-size:16px;font-weight:700;color:var(--text);margin-top:2px;font-family:'DM Mono',monospace">${k.val}</div>
-  </div>`).join('');
-
-  if(!pendRows.length){
-    contentEl.innerHTML = `<div style="padding:40px;text-align:center;color:var(--green);font-size:14px;font-weight:600">🎉 ¡Todos los anunciantes de ${yr} ya han contratado en ${nextYear}!</div>`;
-    return;
-  }
-
-  // ── Agrupar por canal → publicación ──
-  const CANALES = [
-    {key:'DIGITAL', label:'🖥 Digital',  color:'#2563eb'},
-    {key:'PRINT',   label:'📰 Print',    color:'#16a34a'},
-    {key:'EVENTOS', label:'🎪 Eventos',  color:'#7c3aed'},
-  ];
-
-  let html = '';
-
-  CANALES.forEach(({key, label, color}) => {
-    const cRows = pendRows.filter(r => r._canal === key);
-    if(!cRows.length) return;
-
-    // Agrupar por publicación
-    const pubMap = new Map();
-    cRows.forEach(r => {
-      const pub = r._pubClean || r._pub || '—';
-      if(!pubMap.has(pub)) pubMap.set(pub, []);
-      pubMap.get(pub).push(r);
-    });
-
-    // Ordenar pubs por ingreso total desc
-    const pubsSorted = [...pubMap.entries()]
-      .sort((a,b) => b[1].reduce((s,r)=>s+r._ingreso,0) - a[1].reduce((s,r)=>s+r._ingreso,0));
-
-    const cTotal = cRows.reduce((s,r)=>s+r._ingreso,0);
-    const cAnuns = new Set(cRows.map(r=>(r[COL_ANUN]||'').trim())).size;
-
-    html += `<div style="margin-bottom:20px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">
-      <div style="display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:2px solid ${color};background:${color}0d">
-        <span style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:${color}">${label}</span>
-        <span style="font-size:11px;color:var(--text3)">${cAnuns} anunciantes · ${fmtFull(cTotal)} en ${yr}</span>
-      </div>`;
-
-    pubsSorted.forEach(([pub, pubRows]) => {
-      // Dentro de cada pub: agrupar por anunciante y sumar ingreso
-      const anunMap = new Map();
-      pubRows.forEach(r => {
-        const anun = (r[COL_ANUN]||'').trim();
-        if(!anunMap.has(anun)) anunMap.set(anun, {
-          anun, marca:(r[COL_MARCA]||'').trim(), prod:r._prod||'',
-          sector:r._sectorClean||'', area:mapAreaGroup(r._area||''),
-          comercial:fmtComercial(r._comercial||''), ingreso:0
-        });
-        anunMap.get(anun).ingreso += r._ingreso;
-      });
-
-      const anunsSorted = [...anunMap.values()].sort((a,b)=>b.ingreso-a.ingreso);
-      const pubTotal    = anunsSorted.reduce((s,a)=>s+a.ingreso,0);
-
-      html += `<div style="border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 18px;background:var(--bg3);border-bottom:1px solid var(--border2)">
-          <span style="font-size:11px;font-weight:700;color:${color};font-family:'Syne',sans-serif">📰 ${esc(pub)}</span>
-          <span style="font-size:10px;color:var(--text3);margin-left:auto">${anunsSorted.length} pendientes · ${fmtFull(pubTotal)} en ${yr}</span>
-        </div>
-        <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:11px">
-          <thead>
-            <tr style="background:var(--bg3)">
-              <th style="padding:5px 18px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border2);white-space:nowrap">Anunciante</th>
-              <th style="padding:5px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border2);white-space:nowrap">Marca</th>
-              <th style="padding:5px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border2);white-space:nowrap">Producto</th>
-              <th style="padding:5px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border2);white-space:nowrap">Sector</th>
-              <th style="padding:5px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border2);white-space:nowrap">Área</th>
-              <th style="padding:5px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border2);white-space:nowrap">Comercial</th>
-              <th style="padding:5px 18px;text-align:right;font-size:9px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border2);white-space:nowrap">Ingreso ${yr}</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${anunsSorted.map((a,i)=>`<tr style="border-bottom:1px solid var(--border);background:${i%2===0?'var(--bg2)':'var(--bg3)'}">
-              <td style="padding:7px 18px;font-weight:600;color:var(--text)">${esc(a.anun)}</td>
-              <td style="padding:7px 10px;color:var(--text2)">${esc(a.marca)}</td>
-              <td style="padding:7px 10px;color:var(--text3);font-size:10px">${esc(a.prod)}</td>
-              <td style="padding:7px 10px;color:var(--text3);font-size:10px">${esc(a.sector)}</td>
-              <td style="padding:7px 10px;color:var(--text3);font-size:10px">${esc(a.area)}</td>
-              <td style="padding:7px 10px;color:var(--text3);font-size:10px">${esc(a.comercial)}</td>
-              <td style="padding:7px 18px;text-align:right;font-weight:700;color:var(--accent);font-family:'DM Mono',monospace">${fmtFull(a.ingreso)}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-        </div>
-      </div>`;
-    });
-
-    html += '</div>';
-  });
-
-  contentEl.innerHTML = html;
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// EXPORTAR PENDIENTES DE CONTACTAR A PDF
-function exportPendientesPDF(){
-  const yr = document.getElementById('m-f-year').value;
-  if(!yr || yr==='all'){alert('Selecciona un año concreto antes de exportar.');return;}
-
-  const nextYear = String(parseInt(yr)+1);
-  const refRows  = mGetFiltered();
-  if(!refRows.length){alert('No hay datos para exportar con los filtros actuales.');return;}
-
-  const nextAnuns = new Set(DATA.filter(r=>r._yearRaw===nextYear).map(r=>(r[COL_ANUN]||'').trim()).filter(Boolean));
-  const pendRows  = refRows.filter(r=>{const a=(r[COL_ANUN]||'').trim();return a&&!nextAnuns.has(a);});
-  if(!pendRows.length){alert('No hay pendientes: todos los anunciantes ya han contratado en '+nextYear+'.');return;}
-
-  const mesesSel   = mGetSelected('mes');
-  const mesesLabel = mesesSel.includes('all') ? 'todos los meses' : mesesSel.map(m=>MESES_SHORT[m]||m).join(', ');
-  const today      = new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
-  const totalPend  = pendRows.reduce((s,r)=>s+r._ingreso,0);
-  const anunsPend  = new Set(pendRows.map(r=>(r[COL_ANUN]||'').trim())).size;
-
-  const CANALES=[
-    {key:'DIGITAL',label:'Digital',color:'#2563eb'},
-    {key:'PRINT',  label:'Print',  color:'#16a34a'},
-    {key:'EVENTOS',label:'Eventos',color:'#7c3aed'},
-  ];
-
-  function buildSection(canal, label, color){
-    const cRows = pendRows.filter(r=>r._canal===canal);
-    if(!cRows.length) return '';
-
-    // Agrupar por anunciante dentro de cada publicación
-    const pubMap = new Map();
-    cRows.forEach(r=>{
-      const pub = r._pubClean||r._pub||'—';
-      if(!pubMap.has(pub)) pubMap.set(pub,[]);
-      pubMap.get(pub).push(r);
-    });
-
-    const pubsSorted = [...pubMap.entries()]
-      .sort((a,b)=>b[1].reduce((s,r)=>s+r._ingreso,0)-a[1].reduce((s,r)=>s+r._ingreso,0));
-
-    const cTotal = cRows.reduce((s,r)=>s+r._ingreso,0);
-    const cAnuns = new Set(cRows.map(r=>(r[COL_ANUN]||'').trim())).size;
-
-    let rows = '';
-    pubsSorted.forEach(([pub, pubRows])=>{
-      const anunMap = new Map();
-      pubRows.forEach(r=>{
-        const anun=(r[COL_ANUN]||'').trim();
-        if(!anunMap.has(anun)) anunMap.set(anun,{anun,marca:(r[COL_MARCA]||'').trim(),prod:r._prod||'',sector:r._sectorClean||'',area:mapAreaGroup(r._area||''),comercial:fmtComercial(r._comercial||''),ingreso:0});
-        anunMap.get(anun).ingreso+=r._ingreso;
-      });
-      const anunsSorted=[...anunMap.values()].sort((a,b)=>b.ingreso-a.ingreso);
-      const pubTotal=anunsSorted.reduce((s,a)=>s+a.ingreso,0);
-
-      rows+=`<tr style="background:${color}10">
-        <td colspan="6" style="padding:5px 10px;font-weight:700;font-size:9px;color:${color};border-left:3px solid ${color}">📰 ${esc(pub)}</td>
-        <td style="padding:5px 10px;text-align:right;font-weight:700;font-size:9px;color:${color}">${fmtFull(pubTotal)}</td>
-      </tr>`;
-      anunsSorted.forEach((a,i)=>{
-        rows+=`<tr style="background:${i%2===0?'#fff':'#f9fafb'}">
-          <td style="padding:4px 10px 4px 18px;font-weight:600;color:#1a1d27">${esc(a.anun)}</td>
-          <td style="padding:4px 8px;color:#444">${esc(a.marca)}</td>
-          <td style="padding:4px 8px;color:#777;font-size:8px">${esc(a.prod)}</td>
-          <td style="padding:4px 8px;color:#777;font-size:8px">${esc(a.sector)}</td>
-          <td style="padding:4px 8px;color:#777;font-size:8px">${esc(a.area)}</td>
-          <td style="padding:4px 8px;color:#777;font-size:8px">${esc(a.comercial)}</td>
-          <td style="padding:4px 10px;text-align:right;font-weight:700;color:#b45309;font-size:10px">${fmtFull(a.ingreso)}</td>
-        </tr>`;
-      });
-    });
-
-    return `<div class="section-block">
-      <div class="section-header" style="border-left:4px solid ${color};background:${color}12">
-        <span style="font-size:14px;font-weight:800;color:${color}">${label}</span>
-        <span style="font-size:10px;color:#555;margin-left:10px">${cAnuns} anunciantes pendientes · ${fmtFull(cTotal)} facturado en ${yr}</span>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Anunciante</th><th>Marca</th><th>Producto</th>
-            <th>Sector</th><th>Área</th><th>Comercial</th>
-            <th style="text-align:right">Ingreso ${yr}</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-        <tfoot>
-          <tr><td colspan="6">TOTAL ${label}</td><td>${fmtFull(cTotal)}</td></tr>
-        </tfoot>
-      </table>
-    </div>`;
-  }
-
-  const secD = buildSection('DIGITAL','Digital','#2563eb');
-  const secP = buildSection('PRINT',  'Print',  '#16a34a');
-  const secE = buildSection('EVENTOS','Eventos','#7c3aed');
-
-  const html=`<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8">
-<title>Pendientes de contactar · ${yr}</title>
-<style>
-  @page{size:A4 landscape;margin:12mm 10mm 12mm 10mm;}
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:9.5px;color:#1a1d27;background:#fff;}
-  .global-header{display:flex;align-items:flex-start;justify-content:space-between;
-    margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #d4960a;}
-  .brand{font-size:17px;font-weight:800;color:#1a1d27;letter-spacing:-0.3px;}
-  .brand span{color:#d4960a;}
-  .meta{font-size:9px;color:#777;margin-top:4px;}
-  .kpi-row{display:flex;gap:10px;margin-bottom:14px;}
-  .kpi{background:#f5f6f8;border:1px solid #e4e6ed;border-radius:7px;padding:7px 12px;flex:1;}
-  .kpi-label{font-size:8px;text-transform:uppercase;letter-spacing:0.08em;color:#8891ae;font-weight:600;}
-  .kpi-value{font-size:14px;font-weight:700;color:#1a1d27;margin-top:2px;}
-  .section-block{margin-bottom:0;}
-  .section-header{display:flex;align-items:center;padding:8px 14px;border-radius:5px 5px 0 0;}
-  .page-break{page-break-before:always;}
-  table{width:100%;border-collapse:collapse;font-size:9px;}
-  thead tr{background:#1a1d27;color:#fff;}
-  thead th{padding:5px 8px;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:0.07em;font-weight:600;white-space:nowrap;}
-  thead th:last-child{text-align:right;}
-  tbody tr{border-bottom:1px solid #e8eaef;}
-  tbody td{padding:4px 8px;vertical-align:middle;}
-  tfoot tr{background:#f5f6f8;border-top:2px solid #d4960a;}
-  tfoot td{padding:6px 8px;font-weight:700;font-size:9px;}
-  tfoot td:last-child{text-align:right;color:#d4960a;}
-  .footer{margin-top:10px;font-size:7.5px;color:#bbb;text-align:right;
-    border-top:1px solid #e4e6ed;padding-top:5px;}
-  .nota{margin-top:12px;padding:8px 12px;background:#fef9ec;border:1px solid #fde68a;
-    border-radius:6px;font-size:8px;color:#92400e;}
-</style></head><body>
-
-<div class="global-header">
-  <div>
-    <div class="brand">Dashboard <span>Publicitario</span></div>
-    <div class="meta">📋 Pendientes de contactar · ${esc(yr)} (${esc(mesesLabel)}) → sin contrato en ${esc(nextYear)}</div>
-    <div class="meta">Generado: ${today}</div>
-  </div>
-  <div style="text-align:right">
-    <div style="font-size:18px;font-weight:800;color:#d4960a">${fmtFull(totalPend)}</div>
-    <div style="font-size:8px;color:#999;margin-top:2px">${anunsPend} anunciantes pendientes</div>
-  </div>
-</div>
-
-<div class="kpi-row">
-  <div class="kpi"><div class="kpi-label">Año de referencia</div><div class="kpi-value">${esc(yr)}</div></div>
-  <div class="kpi"><div class="kpi-label">Periodo</div><div class="kpi-value">${esc(mesesLabel)}</div></div>
-  <div class="kpi"><div class="kpi-label">Año a cerrar</div><div class="kpi-value">${esc(nextYear)}</div></div>
-  <div class="kpi"><div class="kpi-label">Anunciantes pendientes</div><div class="kpi-value">${anunsPend}</div></div>
-  <div class="kpi"><div class="kpi-label">Ingreso en ${esc(yr)}</div><div class="kpi-value">${fmtFull(totalPend)}</div></div>
-</div>
-
-${secD}
-${secP?'<div class="page-break"></div>'+secP:''}
-${secE?'<div class="page-break"></div>'+secE:''}
-
-<div class="nota">
-  <strong>Nota:</strong> Se consideran pendientes los anunciantes que tuvieron ingresos en ${esc(yr)} (${esc(mesesLabel)}) y que <strong>no tienen ninguna inserción en ${esc(nextYear)}</strong> en ningún mes. En cuanto actualices el Excel con nuevos contratos de ${esc(nextYear)}, desaparecerán de este listado.
-</div>
-
-<div class="footer">Dashboard Publicitario · ${today}</div>
-</body></html>`;
-
-  const win=window.open('','_blank','width=1200,height=800');
-  if(!win){alert('Permite las ventanas emergentes para exportar el PDF.');return;}
-  win.document.write(html);
-  win.document.close();
-  win.onload=()=>{setTimeout(()=>{win.focus();win.print();},400);};
-}
-
-// EXPORTAR DETALLE DE INSERCIONES A PDF
-// Secciones: DIGITAL · PRINT · EVENTOS — cada una con salto de página
-// Dentro de cada sección: agrupado por publicación, dentro de cada pub
-// ordenado por ingreso desc. Los anunciantes del año anterior sin ingreso
-// en el año seleccionado aparecen marcados como PERDIDO.
-// ══════════════════════════════════════════════════════════════════════════════
-function exportDetallePDF(){
-  const yr   = document.getElementById('m-f-year').value;
-  const yrLabel = yr && yr!=='all' ? yr : 'Todos los años';
-
-  // Filas del año seleccionado (respetando todos los filtros activos)
-  const rows = mGetFiltered();
-  if(!rows.length){alert('No hay datos para exportar con los filtros actuales.');return;}
-
-  // Filas del año anterior (mismos filtros salvo el año) para detectar perdidos
-  const hasPrevYear = yr && yr!=='all';
-  const prevYear    = hasPrevYear ? String(parseInt(yr)-1) : null;
-  const prevRows    = hasPrevYear ? mGetPrevFiltered(yr) : [];
-
-  // Anunciantes del año anterior que NO tienen ninguna fila en el año seleccionado
-  const curAnuns  = new Set(rows.map(r=>(r[COL_ANUN]||'').trim()));
-  // Construimos filas "fantasma" de perdidos, una por combinación única pub+anun+marca+prod del año anterior
-  const lostRows = [];
-  if(hasPrevYear){
-    // Agrupar prevRows por canal+pub+anun+marca+prod para evitar duplicados
-    const lostMap = new Map();
-    prevRows.forEach(r=>{
-      const anun = (r[COL_ANUN]||'').trim();
-      if(curAnuns.has(anun)) return; // sí tiene ingreso este año → no es perdido
-      const key = [r._canal, r._pubClean||r._pub||'', anun, (r[COL_MARCA]||'').trim(), r._prod||''].join('|||');
-      if(!lostMap.has(key)){
-        lostMap.set(key,{
-          _canal   : r._canal,
-          _pubClean: r._pubClean||r._pub||'',
-          _anun    : anun,
-          _marca   : (r[COL_MARCA]||'').trim(),
-          _prod    : r._prod||'',
-          _sectorClean: r._sectorClean||'',
-          _area    : (r[COL_AREA]||'').trim(),
-          _comercial  : r._comercial||'',
-          _ingreso : 0,   // sin ingreso este año
-          _prevIngreso: 0, // lo acumulamos abajo
-          _isLost  : true,
-          _prevYear: prevYear
-        });
-      }
-      lostMap.get(key)._prevIngreso += r._ingreso;
-    });
-    lostMap.forEach(v=>lostRows.push(v));
-  }
-
-  // ── Helper: construye el bloque HTML de una sección (un canal) ──
-  function buildSection(canal, canalLabel, canalColor, allRows){
-    // Filas reales de este canal
-    const realRows  = allRows.filter(r=>r._canal===canal && !r._isLost);
-    // Filas perdidas de este canal
-    const lostSect  = lostRows.filter(r=>r._canal===canal);
-
-    if(!realRows.length && !lostSect.length) return '';
-
-    const totalIng = realRows.reduce((s,r)=>s+r._ingreso,0);
-
-    // Agrupar reales por publicación
-    const pubMap = new Map();
-    realRows.forEach(r=>{
-      const pub = r._pubClean||r._pub||'—';
-      if(!pubMap.has(pub)) pubMap.set(pub,[]);
-      pubMap.get(pub).push(r);
-    });
-
-    // Ordenar publicaciones por ingreso total desc
-    const pubsSorted = [...pubMap.entries()]
-      .sort((a,b)=>b[1].reduce((s,r)=>s+r._ingreso,0)-a[1].reduce((s,r)=>s+r._ingreso,0));
-
-    // Agrupar perdidos por publicación
-    const lostPubMap = new Map();
-    lostSect.forEach(r=>{
-      const pub = r._pubClean||'—';
-      if(!lostPubMap.has(pub)) lostPubMap.set(pub,[]);
-      lostPubMap.get(pub).push(r);
-    });
-
-    // ── Construir filas de tabla ──
-    let tableRows = '';
-
-    pubsSorted.forEach(([pub, pubRows])=>{
-      // Subtotal de la publicación
-      const pubTotal = pubRows.reduce((s,r)=>s+r._ingreso,0);
-
-      // Cabecera de publicación
-      tableRows += `<tr class="pub-header">
-        <td colspan="7" style="background:#f0f4ff;color:${canalColor};font-weight:700;font-size:9.5px;padding:5px 10px;border-left:3px solid ${canalColor}">
-          📰 ${esc(pub)}
-        </td>
-        <td style="background:#f0f4ff;color:${canalColor};font-weight:700;text-align:right;padding:5px 10px;font-size:9.5px">
-          ${fmtFull(pubTotal)}
-        </td>
-      </tr>`;
-
-      // Filas reales: ordenadas por ingreso desc
-      pubRows.sort((a,b)=>b._ingreso-a._ingreso).forEach(r=>{
-        tableRows += `<tr>
-          <td style="padding-left:18px">${esc(r._anun||'')}</td>
-          <td>${esc(r._marca||'')}</td>
-          <td style="color:#666;font-size:8.5px">${esc(r._prod||'')}</td>
-          <td style="color:#666;font-size:8.5px">${esc(r._sectorClean||'')}</td>
-          <td style="color:#666;font-size:8.5px">${esc(mapAreaGroup(r._area||''))}</td>
-          <td style="color:#666;font-size:8.5px">${esc(fmtComercial(r._comercial||''))}</td>
-          <td></td>
-          <td style="text-align:right;font-weight:600;color:#1a1d27">${fmt(r._ingreso)}</td>
-        </tr>`;
-      });
-
-      // Perdidos de esta publicación (si los hay)
-      const lostThisPub = lostPubMap.get(pub)||[];
-      lostThisPub.sort((a,b)=>b._prevIngreso-a._prevIngreso).forEach(r=>{
-        tableRows += `<tr class="lost-row">
-          <td style="padding-left:18px;color:#b91c1c">${esc(r._anun||'')}</td>
-          <td style="color:#b91c1c">${esc(r._marca||'')}</td>
-          <td style="color:#b91c1c;font-size:8.5px">${esc(r._prod||'')}</td>
-          <td style="color:#b91c1c;font-size:8.5px">${esc(r._sectorClean||'')}</td>
-          <td style="color:#b91c1c;font-size:8.5px">${esc(mapAreaGroup(r._area||''))}</td>
-          <td style="color:#b91c1c;font-size:8.5px">${esc(fmtComercial(r._comercial||''))}</td>
-          <td style="text-align:center"><span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:4px;font-size:8px;font-weight:700;white-space:nowrap">⚠ PERDIDO ${esc(yr)} · tuvo ${fmtFull(r._prevIngreso)} en ${esc(prevYear)}</span></td>
-          <td style="text-align:right;color:#b91c1c;font-weight:600">—</td>
-        </tr>`;
-      });
-      // Eliminar esta pub del mapa de perdidos para que no se repita al final
-      lostPubMap.delete(pub);
-    });
-
-    // Perdidos cuya publicación no aparece en los reales (pub completamente perdida)
-    if(lostPubMap.size){
-      lostPubMap.forEach((lostPubRows, pub)=>{
-        tableRows += `<tr class="pub-header">
-          <td colspan="7" style="background:#fff5f5;color:#b91c1c;font-weight:700;font-size:9.5px;padding:5px 10px;border-left:3px solid #b91c1c">
-            📰 ${esc(pub)} <span style="font-weight:400;font-size:8.5px">(publicación sin ingresos en ${esc(yr)})</span>
-          </td>
-          <td style="background:#fff5f5;color:#b91c1c;font-weight:700;text-align:right;padding:5px 10px;font-size:9.5px">—</td>
-        </tr>`;
-        lostPubRows.sort((a,b)=>b._prevIngreso-a._prevIngreso).forEach(r=>{
-          tableRows += `<tr class="lost-row">
-            <td style="padding-left:18px;color:#b91c1c">${esc(r._anun||'')}</td>
-            <td style="color:#b91c1c">${esc(r._marca||'')}</td>
-            <td style="color:#b91c1c;font-size:8.5px">${esc(r._prod||'')}</td>
-            <td style="color:#b91c1c;font-size:8.5px">${esc(r._sectorClean||'')}</td>
-            <td style="color:#b91c1c;font-size:8.5px">${esc(mapAreaGroup(r._area||''))}</td>
-            <td style="color:#b91c1c;font-size:8.5px">${esc(fmtComercial(r._comercial||''))}</td>
-            <td style="text-align:center"><span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:4px;font-size:8px;font-weight:700;white-space:nowrap">⚠ PERDIDO ${esc(yr)} · tuvo ${fmtFull(r._prevIngreso)} en ${esc(prevYear)}</span></td>
-            <td style="text-align:right;color:#b91c1c;font-weight:600">—</td>
-          </tr>`;
-        });
-      });
-    }
-
-    const numReal = realRows.length;
-    const numLost = lostSect.length;
-
-    return `
-    <div class="section-block">
-      <div class="section-header" style="border-left:4px solid ${canalColor};background:${canalColor}12">
-        <span style="font-size:15px;font-weight:800;color:${canalColor};letter-spacing:-0.3px">${canalLabel}</span>
-        <span style="font-size:11px;color:#555;margin-left:12px">${numReal} inserciones · ${fmtFull(totalIng)}</span>
-        ${numLost?`<span style="font-size:10px;color:#b91c1c;margin-left:10px;background:#fee2e2;padding:2px 8px;border-radius:4px">⚠ ${numLost} perdidos vs ${prevYear}</span>`:''}
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Anunciante</th>
-            <th>Marca</th>
-            <th>Producto</th>
-            <th>Sector</th>
-            <th>Área</th>
-            <th>Comercial</th>
-            <th style="text-align:center">Estado</th>
-            <th style="text-align:right">Ingreso neto</th>
-          </tr>
-        </thead>
-        <tbody>${tableRows}</tbody>
-        <tfoot>
-          <tr>
-            <td colspan="7">TOTAL ${canalLabel} (${numReal} inserciones)</td>
-            <td>${fmtFull(totalIng)}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>`;
-  }
-
-  const secDigital = buildSection('DIGITAL','Digital','#2563eb', rows);
-  const secPrint   = buildSection('PRINT',  'Print',  '#16a34a', rows);
-  const secEventos = buildSection('EVENTOS','Eventos','#7c3aed', rows);
-
-  const grandTotal = rows.reduce((s,r)=>s+r._ingreso,0);
-  const today = new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
-
-  const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Detalle de inserciones · ${yrLabel}</title>
-<style>
-  @page{size:A4 landscape;margin:12mm 10mm 12mm 10mm;}
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:9.5px;color:#1a1d27;background:#fff;}
-
-  /* Portada / cabecera global */
-  .global-header{display:flex;align-items:flex-start;justify-content:space-between;
-    margin-bottom:18px;padding-bottom:12px;border-bottom:2px solid #d4960a;}
-  .brand{font-size:18px;font-weight:800;letter-spacing:-0.4px;color:#1a1d27;}
-  .brand span{color:#d4960a;}
-  .meta{font-size:10px;color:#777;margin-top:5px;}
-  .grand-total{font-size:20px;font-weight:800;color:#d4960a;text-align:right;}
-  .grand-sub{font-size:9px;color:#999;text-align:right;margin-top:2px;}
-
-  /* Sección por canal */
-  .section-block{margin-bottom:0;}
-  .section-header{display:flex;align-items:center;padding:9px 14px;margin-bottom:0;border-radius:6px 6px 0 0;}
-
-  /* Salto entre secciones */
-  .page-break{page-break-before:always;}
-
-  /* Tabla */
-  table{width:100%;border-collapse:collapse;font-size:9px;}
-  thead tr{background:#1a1d27;color:#fff;}
-  thead th{padding:6px 8px;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:0.07em;font-weight:600;white-space:nowrap;}
-  thead th:last-child{text-align:right;}
-  tbody tr{border-bottom:1px solid #e8eaef;}
-  tbody tr:nth-child(even){background:#fafbfc;}
-  tbody td{padding:4px 8px;vertical-align:middle;}
-  tbody td:last-child{text-align:right;}
-  .lost-row{background:#fff8f8 !important;}
-  tfoot tr{background:#f5f6f8;border-top:2px solid #d4960a;}
-  tfoot td{padding:6px 8px;font-weight:700;font-size:9.5px;}
-  tfoot td:last-child{text-align:right;color:#d4960a;}
-
-  .footer{margin-top:10px;font-size:7.5px;color:#bbb;text-align:right;
-    border-top:1px solid #e4e6ed;padding-top:5px;}
-
-  /* Leyenda final */
-  .legend{margin-top:14px;padding:8px 12px;background:#fff8f8;border:1px solid #fecaca;
-    border-radius:6px;font-size:8.5px;color:#b91c1c;}
-</style>
-</head>
-<body>
-
-<div class="global-header">
-  <div>
-    <div class="brand">Dashboard <span>Publicitario</span></div>
-    <div class="meta">Detalle de inserciones · ${esc(yrLabel)}${hasPrevYear?' · comparado con '+esc(prevYear):''}</div>
-    <div class="meta">Generado: ${today}</div>
-  </div>
-  <div>
-    <div class="grand-total">${fmtFull(grandTotal)}</div>
-    <div class="grand-sub">Total ingresos netos · ${rows.length} inserciones</div>
-  </div>
-</div>
-
-${secDigital}
-${secPrint   ? `<div class="page-break"></div>${secPrint}`  :''}
-${secEventos ? `<div class="page-break"></div>${secEventos}`:''}
-
-${hasPrevYear?`<div class="legend">
-  <strong>⚠ Filas marcadas como PERDIDO:</strong> anunciantes que tuvieron ingresos en ${esc(prevYear)} pero <strong>no tienen ninguna inserción en ${esc(yr)}</strong> con los filtros activos. Se muestran dentro de su publicación habitual para que no se te escape ninguno.
-</div>`:''}
-
-<div class="footer">Dashboard Publicitario · ${today}</div>
-</body>
-</html>`;
-
-  const win = window.open('','_blank','width=1200,height=800');
-  if(!win){alert('Por favor, permite las ventanas emergentes para exportar el PDF.');return;}
-  win.document.write(html);
-  win.document.close();
-  win.onload = ()=>{ setTimeout(()=>{ win.focus(); win.print(); }, 400); };
-}
-
-
-// ══════════════════════════════════════════════════════════════════════════════
 // PUBLICACIONES POR ÁREA
 // ══════════════════════════════════════════════════════════════════════════════
 const areaPubSelected = new Set();
@@ -3345,6 +2724,354 @@ function renderAreaPub(){
         ${buildPubCol('PRINT','var(--green)','green')}
       </div>
     </div>`;
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// VISTA PM SIN LÍNEAS 0€ — lógica independiente
+// ══════════════════════════════════════════════════════════════════════════════
+let mPMSortCol0='pm', mPMSortAsc0=false;
+let mExpandedAnuns0 = new Set();
+
+// Click expand/collapse para la tabla s/0
+document.addEventListener('click', function(e){
+  const row = e.target.closest('tr[data-toggle-anun0]');
+  if(!row) return;
+  const name = decodeURIComponent(row.getAttribute('data-toggle-anun0'));
+  if(mExpandedAnuns0.has(name)) mExpandedAnuns0.delete(name);
+  else mExpandedAnuns0.add(name);
+  renderTable0();
+});
+
+function sortPMTable0(col){
+  if(mPMSortCol0===col) mPMSortAsc0=!mPMSortAsc0;
+  else{ mPMSortCol0=col; mPMSortAsc0=false; }
+  ['pm','pmPrev','delta'].forEach(c=>{
+    const el=document.getElementById('m0-th-'+c.replace('pmPrev','pmprev'));
+    if(el){
+      const labels={'pm':'PM Año sel.','pmPrev':'PM Año ant.','delta':'% Var.'};
+      el.textContent=labels[c]+(mPMSortCol0===c?(mPMSortAsc0?' ↑':' ↓'):' ↕');
+    }
+  });
+  renderTable0();
+}
+
+// Calcula PM igual que calcPresupuestoMedio pero ANTES elimina filas con _ingreso===0
+function calcPresupuestoMedio0(rows){
+  const rows0 = rows.filter(r => r._ingreso !== 0);
+  return calcPresupuestoMedio(rows0);
+}
+
+function getFiltered0(){
+  // Mismos filtros que la vista principal pero sin líneas con ingreso 0
+  const base = mGetFiltered();
+  return base.filter(r => r._ingreso !== 0);
+}
+
+function getPrevFiltered0(yr){
+  const prev = mGetPrevFiltered(yr);
+  return prev.filter(r => r._ingreso !== 0);
+}
+
+function renderTable0(){
+  const data = getFiltered0();
+  const yr = document.getElementById('m-f-year').value;
+  const hasPrev = yr && yr !== 'all';
+  const prevRows = hasPrev ? getPrevFiltered0(yr) : [];
+
+  let nuevosSet=new Set(), perdidosSet=new Set();
+  let prevAnunRowsMap=new Map();
+
+  if(hasPrev){
+    prevRows.forEach(r=>{
+      const a=(r[COL_ANUN]||'').trim();
+      if(!prevAnunRowsMap.has(a)) prevAnunRowsMap.set(a,[]);
+      prevAnunRowsMap.get(a).push(r);
+    });
+    const curAnuns=new Set(data.map(r=>(r[COL_ANUN]||'').trim()));
+    const prevAnuns=new Set(prevAnunRowsMap.keys());
+    curAnuns.forEach(a=>{if(!prevAnuns.has(a)) nuevosSet.add(a);});
+    prevAnuns.forEach(a=>{if(!curAnuns.has(a)) perdidosSet.add(a);});
+  }
+
+  // Agrupar por anunciante
+  const anunMap=new Map();
+  data.forEach(r=>{
+    const anun=(r[COL_ANUN]||'').trim();
+    if(!anunMap.has(anun)) anunMap.set(anun,{rows:[]});
+    anunMap.get(anun).rows.push(r);
+  });
+
+  let anunList=[...anunMap.entries()].map(([anun,val])=>{
+    const {pm,netIngreso,netCount}=calcPresupuestoMedio0(val.rows);
+    const prevRowsAnun=prevAnunRowsMap.get(anun)||[];
+    const {pm:pmPrev}=calcPresupuestoMedio0(prevRowsAnun);
+    const delta=(pm>0&&pmPrev>0)?((pm-pmPrev)/pmPrev)*100:null;
+    return {anun,rows:val.rows,pm,netIngreso,netCount,pmPrev,delta};
+  });
+
+  anunList.sort((a,b)=>{
+    if(mPMSortCol0==='delta'){
+      const da=a.delta??(mPMSortAsc0?-Infinity:Infinity);
+      const db=b.delta??(mPMSortAsc0?-Infinity:Infinity);
+      return mPMSortAsc0?da-db:db-da;
+    }
+    if(mPMSortCol0==='pmPrev') return mPMSortAsc0?a.pmPrev-b.pmPrev:b.pmPrev-a.pmPrev;
+    return mPMSortAsc0?a.pm-b.pm:b.pm-a.pm;
+  });
+
+  const estadoFilter=document.getElementById('m-f-estado-anun').value;
+  let perdidoList=[];
+  if(hasPrev&&estadoFilter!=='ganados'){
+    perdidosSet.forEach(anun=>{
+      const pRowsAnun=prevAnunRowsMap.get(anun)||[];
+      const {pm:pmPrev}=calcPresupuestoMedio0(pRowsAnun);
+      perdidoList.push({anun,pmPrev});
+    });
+    perdidoList.sort((a,b)=>b.pmPrev-a.pmPrev);
+  }
+
+  document.getElementById('m0-tabla-count-msg').textContent=
+    `${anunList.length} anunciantes`+(perdidoList.length?` · ${perdidoList.length} perdidos`:'');
+
+  const NCOLS=10;
+  const tbody=document.getElementById('m0-tabla-body');
+  if(!anunList.length&&!perdidoList.length){
+    tbody.innerHTML=`<tr><td colspan="${NCOLS}" style="text-align:center;color:var(--text3);padding:32px">Sin datos para los filtros seleccionados</td></tr>`;
+    return;
+  }
+
+  // Helper celdas PM (reutiliza mismo estilo)
+  function pmCells0(pm,pmPrev,delta,isNuevo,isPerdido){
+    const pmStr=pm>0?fmtAvg(Math.round(pm)):'—';
+    const pmPrevStr=pmPrev>0?fmtAvg(Math.round(pmPrev)):'—';
+    let deltaHtml;
+    if(isPerdido){
+      deltaHtml=`<td class="pm-col-delta"><span class="badge-perdido">PERDIDO</span></td>`;
+    } else if(isNuevo||!hasPrev){
+      deltaHtml=`<td class="pm-col-delta">${hasPrev?'<span class="badge-nuevo">NUEVO</span>':'—'}</td>`;
+    } else if(delta===null){
+      deltaHtml=`<td class="pm-col-delta" style="color:var(--text3)">—</td>`;
+    } else {
+      const sign=delta>=0?'+':'';
+      const col=delta>=0?'var(--green)':'var(--red)';
+      deltaHtml=`<td class="pm-col-delta" style="color:${col};font-weight:700">${sign}${delta.toFixed(1)}%</td>`;
+    }
+    return `<td class="pm-col-cur">${pmStr}</td><td class="pm-col-prev">${pmPrevStr}</td>${deltaHtml}`;
+  }
+
+  let html='';
+
+  anunList.forEach(({anun,rows,pm,netCount,pmPrev,delta})=>{
+    const isExpanded=mExpandedAnuns0.has(anun);
+    const isNuevo=nuevosSet.has(anun);
+
+    const pubMap={},secMap={},areaMap={},canalMap={},comMap={};
+    rows.forEach(r=>{
+      const p=(r._pubNorm||''); pubMap[p]=(pubMap[p]||0)+r._ingreso;
+      const s=(r._sectorClean||''); secMap[s]=(secMap[s]||0)+1;
+      const a=(r[COL_AREA]||'').trim(); areaMap[a]=(areaMap[a]||0)+1;
+      const c=(r._canal||''); canalMap[c]=(canalMap[c]||0)+r._ingreso;
+      const co=fmtComercial(r[COL_COMERCIAL]); comMap[co]=(comMap[co]||0)+r._ingreso;
+    });
+    const topPub=Object.entries(pubMap).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+    const topSector=Object.entries(secMap).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+    const topArea=Object.entries(areaMap).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+    const topCanal=Object.entries(canalMap).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+    const topCom=Object.entries(comMap).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+    const multiPub=Object.keys(pubMap).filter(k=>k).length>1;
+    const canalPill=topCanal?`<span class="pill ${CANAL_PILL[topCanal]||'pill-blue'}">${topCanal}${Object.keys(canalMap).filter(k=>k).length>1?' +':''}</span>`:'';
+    const nuevoBadge=isNuevo?`<span class="pill pill-green" style="margin-left:6px;font-size:9px">NUEVO</span>`:'';
+    const insLabel=netCount>0?`${netCount} ins.`:`${rows.length} ins.`;
+
+    html+=`<tr class="anun-row-header${isExpanded?' expanded':''}" data-toggle-anun0="${encodeURIComponent(anun)}" style="cursor:pointer">
+      <td class="td-left"><div style="display:flex;align-items:center">
+        <span class="anun-toggle-icon">${isExpanded?'▲':'▼'}</span>
+        <strong style="color:var(--text)">${anun}</strong>${nuevoBadge}
+        <span style="font-size:10px;color:var(--text3);margin-left:8px">${insLabel}</span>
+      </div></td>
+      <td style="font-size:11px;color:var(--text3)">${topPub}${multiPub?'<span style="color:var(--blue);font-size:9px;margin-left:3px">+varios</span>':''}</td>
+      <td style="font-size:11px;color:var(--text3)">—</td>
+      <td style="font-size:11px;color:var(--text3)">${topSector}</td>
+      <td style="font-size:11px;color:var(--text3)">${topArea}</td>
+      <td>${canalPill}</td>
+      <td style="font-size:11px;color:var(--text3)">${topCom}</td>
+      ${pmCells0(pm,pmPrev,delta,isNuevo,false)}
+    </tr>`;
+
+    if(isExpanded){
+      // Nivel MARCA
+      const marcaMap=new Map();
+      rows.forEach(r=>{
+        const marca=(r[COL_MARCA]||'').trim()||'(sin marca)';
+        if(!marcaMap.has(marca)) marcaMap.set(marca,{rows:[]});
+        marcaMap.get(marca).rows.push(r);
+      });
+
+      const prevMarcaRowsMap=new Map();
+      if(hasPrev){
+        (prevAnunRowsMap.get(anun)||[]).forEach(r=>{
+          const m=(r[COL_MARCA]||'').trim()||'(sin marca)';
+          if(!prevMarcaRowsMap.has(m)) prevMarcaRowsMap.set(m,[]);
+          prevMarcaRowsMap.get(m).push(r);
+        });
+      }
+
+      const marcaList=[...marcaMap.entries()].map(([marca,val])=>{
+        const {pm:mPM,netCount:mNC}=calcPresupuestoMedio0(val.rows);
+        const prevMRows=prevMarcaRowsMap.get(marca)||[];
+        const {pm:mPMPrev}=calcPresupuestoMedio0(prevMRows);
+        const mDelta=(mPM>0&&mPMPrev>0)?((mPM-mPMPrev)/mPMPrev)*100:null;
+        const mIsNuevo=hasPrev&&!prevMarcaRowsMap.has(marca);
+        return {marca,rows:val.rows,pm:mPM,netCount:mNC,pmPrev:mPMPrev,delta:mDelta,isNuevo:mIsNuevo};
+      }).sort((a,b)=>b.pm-a.pm);
+
+      marcaList.forEach(({marca,rows:mRows,pm:mPM,netCount:mNC,pmPrev:mPMPrev,delta:mDelta,isNuevo:mIsNuevo})=>{
+        const marcaKey=anun+'::'+marca;
+        const isMarcaExpanded=mExpandedAnuns0.has(marcaKey);
+        const mCanal=mRows.reduce((best,r)=>(!best||r._ingreso>best._ingreso?r:best),null)?._canal||'';
+        const pubs=[...new Set(mRows.map(r=>r._pubNorm).filter(Boolean))];
+        const mInsLabel=mNC>0?`${mNC} ins.`:`${mRows.length} ins.`;
+
+        html+=`<tr class="anun-row-sub marca-row-header" data-toggle-anun0="${encodeURIComponent(marcaKey)}" style="cursor:pointer;background:#f0f2f8">
+          <td class="td-left"><span style="display:inline-flex;align-items:center;gap:6px">
+            <span class="anun-toggle-icon" style="width:15px;height:15px;font-size:8px">${isMarcaExpanded?'▲':'▼'}</span>
+            <span style="color:var(--text2);font-weight:500">↳ ${marca}</span>
+            <span style="font-size:10px;color:var(--text3)">${mInsLabel}</span>
+          </span></td>
+          <td style="font-size:11px;color:var(--text3)">${pubs.slice(0,3).join(', ')}${pubs.length>3?' +':''}</td>
+          <td style="font-size:11px;color:var(--text3)">—</td>
+          <td style="font-size:11px;color:var(--text3)">${mRows[0]?._sectorClean||''}</td>
+          <td style="font-size:11px;color:var(--text3)">${(mRows[0]?.[COL_AREA]||'').trim()}</td>
+          <td><span class="pill ${CANAL_PILL[mCanal]||'pill-blue'}" style="font-size:9px">${mCanal}</span></td>
+          <td style="font-size:11px;color:var(--text3)">${fmtComercial(mRows[0]?.[COL_COMERCIAL])}</td>
+          ${pmCells0(mPM,mPMPrev,mDelta,mIsNuevo,false)}
+        </tr>`;
+
+        if(isMarcaExpanded){
+          // Nivel PRODUCTO+PUB
+          const prodPubMap=new Map();
+          mRows.forEach(r=>{
+            const prod=(r[COL_PROD]||'').trim()||'(sin producto)';
+            const pub=r._pubClean||r._pubNorm||r._pub||'—';
+            const key=prod+'|||'+pub;
+            if(!prodPubMap.has(key)) prodPubMap.set(key,{prod,pub,rows:[],canal:r._canal,sector:r._sectorClean||'',area:(r[COL_AREA]||'').trim(),com:fmtComercial(r[COL_COMERCIAL]||'')});
+            prodPubMap.get(key).rows.push(r);
+          });
+
+          const prevProdPubMap=new Map();
+          if(hasPrev){
+            (prevMarcaRowsMap.get(marca)||[]).forEach(r=>{
+              const prod=(r[COL_PROD]||'').trim()||'(sin producto)';
+              const pub=r._pubClean||r._pubNorm||r._pub||'—';
+              const key=prod+'|||'+pub;
+              if(!prevProdPubMap.has(key)) prevProdPubMap.set(key,[]);
+              prevProdPubMap.get(key).push(r);
+            });
+          }
+
+          const prodList=[...prodPubMap.values()].map(v=>{
+            const {pm:pPM,netCount:pNC}=calcPresupuestoMedio0(v.rows);
+            const prevPRows=prevProdPubMap.get(v.prod+'|||'+v.pub)||[];
+            const {pm:pPMPrev}=calcPresupuestoMedio0(prevPRows);
+            const pDelta=(pPM>0&&pPMPrev>0)?((pPM-pPMPrev)/pPMPrev)*100:null;
+            const pIsNuevo=hasPrev&&prevPRows.length===0;
+            return {...v,pm:pPM,netCount:pNC,pmPrev:pPMPrev,delta:pDelta,isNuevo:pIsNuevo};
+          }).sort((a,b)=>b.pm-a.pm);
+
+          prodList.forEach(({prod,pub,pm:pPM,netCount:pNC,pmPrev:pPMPrev,delta:pDelta,isNuevo:pIsNuevo,canal:pCanal,sector:pSec,area:pArea,com:pCom,rows:pRows})=>{
+            const pInsLabel=pNC>0?`${pNC} ins.`:`${pRows.length} ins.`;
+            html+=`<tr class="anun-row-sub" style="background:#fafbff">
+              <td class="td-left" style="padding-left:52px;font-size:11px">
+                <span style="color:var(--text3)">↳↳ ${prod}</span>
+                <span style="font-size:10px;color:var(--text3);margin-left:6px">${pInsLabel}</span>
+              </td>
+              <td style="font-size:11px;color:var(--text3)">${pub}</td>
+              <td style="font-size:11px;color:var(--text2);font-weight:500">${prod}</td>
+              <td style="font-size:11px;color:var(--text3)">${pSec}</td>
+              <td style="font-size:11px;color:var(--text3)">${pArea}</td>
+              <td><span class="pill ${CANAL_PILL[pCanal]||'pill-blue'}" style="font-size:9px">${pCanal}</span></td>
+              <td style="font-size:11px;color:var(--text3)">${pCom}</td>
+              ${pmCells0(pPM,pPMPrev,pDelta,pIsNuevo,false)}
+            </tr>`;
+          });
+        }
+      });
+
+      // Marcas perdidas
+      if(hasPrev){
+        const curMarcas=new Set(marcaList.map(m=>m.marca));
+        prevMarcaRowsMap.forEach((pMRows,marca)=>{
+          if(curMarcas.has(marca)) return;
+          const {pm:pPMPrev}=calcPresupuestoMedio0(pMRows);
+          const pPubs=[...new Set(pMRows.map(r=>r._pubClean||r._pubNorm||r._pub||'').filter(Boolean))].slice(0,3).join(', ');
+          const pProds=[...new Set(pMRows.map(r=>r._prod||'').filter(Boolean))].slice(0,3).join(', ');
+          const pSector=pMRows[0]?._sectorClean||'';
+          const pArea=(pMRows[0]?.[COL_AREA]||'').trim();
+          const pCanal=pMRows.reduce((best,r)=>(!best||r._ingreso>best._ingreso?r:best),null)?._canal||'';
+          const pCom=fmtComercial(pMRows[0]?.[COL_COMERCIAL]||'');
+          html+=`<tr class="anun-row-sub row-perdido-sub">
+            <td class="td-left"><span style="padding-left:24px">↳ ${marca}</span><span class="badge-perdido" style="margin-left:6px">PERDIDO</span></td>
+            <td style="font-size:11px;color:#991b1b">${pPubs||'—'}</td>
+            <td style="font-size:11px;color:#991b1b">${pProds||'—'}</td>
+            <td style="font-size:11px;color:#991b1b">${pSector||'—'}</td>
+            <td style="font-size:11px;color:#991b1b">${pArea||'—'}</td>
+            <td><span class="pill ${CANAL_PILL[pCanal]||'pill-blue'}" style="font-size:9px">${pCanal}</span></td>
+            <td style="font-size:11px;color:#991b1b">${pCom||'—'}</td>
+            <td class="pm-col-cur" style="color:#991b1b!important">—</td>
+            <td class="pm-col-prev" style="color:#991b1b!important">${fmtAvg(Math.round(pPMPrev))}</td>
+            <td class="pm-col-delta"><span class="badge-perdido">PERDIDO</span></td>
+          </tr>`;
+        });
+      }
+    }
+  });
+
+  // Anunciantes perdidos
+  perdidoList.forEach(({anun,pmPrev})=>{
+    const perdidoKey='__perdido0__'+anun;
+    const isPerdidoExpanded=mExpandedAnuns0.has(perdidoKey);
+    html+=`<tr class="anun-row-header row-perdido" data-toggle-anun0="${encodeURIComponent(perdidoKey)}" style="cursor:pointer">
+      <td class="td-left"><div style="display:flex;align-items:center">
+        <span class="anun-toggle-icon">${isPerdidoExpanded?'▲':'▼'}</span>
+        <span style="font-weight:600">${anun}</span>
+        <span class="badge-perdido" style="margin-left:8px">PERDIDO</span>
+      </div></td>
+      <td colspan="5" style="font-size:11px;font-style:italic">— no aparece en el año seleccionado —</td>
+      <td class="pm-col-cur" style="color:#991b1b!important">—</td>
+      <td class="pm-col-prev" style="color:#991b1b!important">${fmtAvg(Math.round(pmPrev))}</td>
+      <td class="pm-col-delta"><span class="badge-perdido">PERDIDO</span></td>
+    </tr>`;
+
+    if(isPerdidoExpanded&&hasPrev){
+      const pRowsAnun=prevAnunRowsMap.get(anun)||[];
+      const marcaMap2=new Map();
+      pRowsAnun.forEach(r=>{
+        const m=(r[COL_MARCA]||'').trim()||'(sin marca)';
+        if(!marcaMap2.has(m)) marcaMap2.set(m,[]);
+        marcaMap2.get(m).push(r);
+      });
+      marcaMap2.forEach((pMRows,marca)=>{
+        const {pm:pPMPrev}=calcPresupuestoMedio0(pMRows);
+        const pubs2=[...new Set(pMRows.map(r=>r._pubNorm).filter(Boolean))];
+        const mCanal2=pMRows.reduce((best,r)=>(!best||r._ingreso>best._ingreso?r:best),null)?._canal||'';
+        html+=`<tr class="anun-row-sub row-perdido-sub">
+          <td class="td-left"><span style="padding-left:24px">↳ ${marca}</span><span class="badge-perdido" style="margin-left:6px;font-size:9px">PERDIDO</span></td>
+          <td style="font-size:11px">${pubs2.slice(0,3).join(', ')}${pubs2.length>3?' +':''}</td>
+          <td style="font-size:11px">${pMRows[0]?._prod||''}</td>
+          <td style="font-size:11px">${pMRows[0]?._sectorClean||''}</td>
+          <td style="font-size:11px">${(pMRows[0]?.[COL_AREA]||'').trim()}</td>
+          <td><span class="pill ${CANAL_PILL[mCanal2]||'pill-blue'}" style="font-size:9px">${mCanal2}</span></td>
+          <td style="font-size:11px">${fmtComercial(pMRows[0]?.[COL_COMERCIAL]||'')}</td>
+          <td class="pm-col-cur" style="color:#991b1b!important">—</td>
+          <td class="pm-col-prev" style="color:#991b1b!important">${fmtAvg(Math.round(pPMPrev))}</td>
+          <td class="pm-col-delta"><span class="badge-perdido">PERDIDO</span></td>
+        </tr>`;
+      });
+    }
+  });
+
+  tbody.innerHTML=html;
 }
 
 </script>
