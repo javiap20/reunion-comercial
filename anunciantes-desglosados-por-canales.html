@@ -419,6 +419,16 @@ h1 {
                 </div>
             </div>
 
+            <!-- Botón PDF -->
+            <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+                <button id="btnPrintAnunciantes" onclick="printAnunciantes()" style="display:flex;align-items:center;gap:8px;padding:10px 20px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#cbd5e1;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;letter-spacing:0.04em;text-transform:uppercase;"
+                  onmouseover="this.style.background='#22d3ee';this.style.color='#001018';this.style.borderColor='#22d3ee'"
+                  onmouseout="this.style.background='#0f172a';this.style.color='#cbd5e1';this.style.borderColor='#334155'">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                  PDF / Imprimir todo
+                </button>
+            </div>
+
             <div id="rankingView">
                 <div class="header-row grid-layout">
                     <div>Anunciantes (por orden de fact.)</div>
@@ -1097,6 +1107,271 @@ fYear1.onchange = fYear2.onchange = fPub.onchange = fSector.onchange = render;
   if (link) link.classList.add('hn-active');
 })();
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// IMPRIMIR / PDF — RANKING ANUNCIANTES COMPLETO (toda la jerarquía)
+// ══════════════════════════════════════════════════════════════════════════════
+function printAnunciantes() {
+    const y1 = fYear1.value, y2 = fYear2.value;
+    if (!y1 || !y2) { alert('Selecciona los dos años antes de imprimir.'); return; }
+
+    const ads = aggregate();
+    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function f(n) { return Math.round(n||0).toLocaleString('de-DE') + '€'; }
+    function fSigned(n) { const v=Math.round(n||0); return (v>0?'+':'')+v.toLocaleString('de-DE')+'€'; }
+    function pctStr(v1, v2) {
+        if (!v2 && !v1) return '<span class="c-muted">—</span>';
+        if (!v2 && v1>0) return '<span class="c-nuevo">NUEVO</span>';
+        if (!v1 && v2>0) return '<span class="c-perdido">PERDIDO</span>';
+        if (v1===v2)     return '<span class="c-muted">=</span>';
+        const p = ((v1-v2)/v2)*100;
+        return `<span class="${p>=0?'c-pos':'c-neg'}">${p>=0?'+':''}${p.toFixed(0)}%</span>`;
+    }
+    function cell(v1, v2, main=false) {
+        return `<td class="${main?'td-main':''}""><span class="v">${f(v1)}</span><br>${pctStr(v1,v2)}</td>`;
+    }
+
+    let sorted = Object.keys(ads).map(k=>({name:k,...ads[k]})).sort((a,b)=>b.y1-a.y1);
+    if (selVista === 'GANADOS') sorted = sorted.filter(a=>a.y1>0&&a.y2===0);
+    else if (selVista === 'PERDIDOS') sorted = sorted.filter(a=>a.y1===0&&a.y2>0).sort((a,b)=>b.y2-a.y2);
+
+    let totalY1=0, totalY2=0;
+    sorted.forEach(x=>{ totalY1+=x.y1; totalY2+=x.y2; });
+    const totalDiff = totalY1-totalY2, totalPct = totalY2 ? (totalDiff/totalY2*100) : 0;
+
+    let rankingRows = '';
+    sorted.forEach((a, idx) => {
+        rankingRows += `<tr class="tr-adv">
+            <td class="td-name"><span class="pos-num">${idx+1}</span><strong>${esc(a.name)}</strong></td>
+            ${cell(a.y1, a.y2, true)}
+            ${cell(a.ev1, a.ev2)}
+            ${cell(a.pr1, a.pr2)}
+            ${cell(a.di1, a.di2)}
+            ${cell(a.pg1, a.pg2)}
+        </tr>`;
+        const marcasReales = Object.entries(a.marcas)
+            .filter(([k,v]) => k !== '__SIN_MARCA__' && (v.y1>0||v.y2>0))
+            .sort((x,y) => y[1].y1 - x[1].y1);
+        marcasReales.forEach(([nombre, m]) => {
+            rankingRows += `<tr class="tr-marca">
+                <td class="td-name"><span class="indent-marca">↳</span>${esc(nombre)}</td>
+                ${cell(m.y1, m.y2, true)}
+                ${cell(m.ev1, m.ev2)}
+                ${cell(m.pr1, m.pr2)}
+                ${cell(m.di1, m.di2)}
+                ${cell(m.pg1, m.pg2)}
+            </tr>`;
+            const prods = Object.entries(m.productos)
+                .filter(([,p]) => p.y1>0||p.y2>0)
+                .sort((x,y) => y[1].y1 - x[1].y1);
+            prods.forEach(([,p]) => {
+                rankingRows += `<tr class="tr-prod">
+                    <td class="td-name"><span class="indent-prod">·</span>${esc(p.nombre)}<span class="publi-tag">${esc(p.publi)}</span></td>
+                    ${cell(p.y1, p.y2, true)}
+                    ${cell(p.ev1, p.ev2)}
+                    ${cell(p.pr1, p.pr2)}
+                    ${cell(p.di1, p.di2)}
+                    ${cell(p.pg1, p.pg2)}
+                </tr>`;
+            });
+        });
+    });
+
+    const lostRows_data = Object.keys(ads).map(k=>{
+        const a = ads[k];
+        return { name:k, ...a, lossAbs: a.y2-a.y1 };
+    }).filter(x => x.y1 < x.y2).sort((a,b) => b.lossAbs - a.lossAbs);
+
+    let lostTotalY1=0, lostTotalY2=0;
+    lostRows_data.forEach(x=>{ lostTotalY1+=x.y1; lostTotalY2+=x.y2; });
+
+    let lostRows = '';
+    lostRows_data.forEach((a, idx) => {
+        const lostLabel = a.y1===0 ? '<span class="c-perdido">PERDIDO</span>' : pctStr(a.y1, a.y2);
+        lostRows += `<tr class="tr-adv tr-lost-adv">
+            <td class="td-name"><span class="pos-num">${idx+1}</span><strong>${esc(a.name)}</strong></td>
+            <td class="td-main"><span class="v c-neg">${f(a.lossAbs)}</span><br>${lostLabel}</td>
+            ${cell(a.ev1, a.ev2)}
+            ${cell(a.pr1, a.pr2)}
+            ${cell(a.di1, a.di2)}
+            ${cell(a.pg1, a.pg2)}
+        </tr>`;
+        const marcasConPerdida = Object.entries(a.marcas)
+            .filter(([k,v]) => k !== '__SIN_MARCA__' && v.y1 < v.y2)
+            .sort((x,y) => (y[1].y2-y[1].y1) - (x[1].y2-x[1].y1));
+        marcasConPerdida.forEach(([nombre, m]) => {
+            const mloss = m.y2-m.y1;
+            const mlostLabel = m.y1===0 ? '<span class="c-perdido">PERDIDO</span>' : pctStr(m.y1, m.y2);
+            lostRows += `<tr class="tr-marca tr-lost-marca">
+                <td class="td-name"><span class="indent-marca">↳</span>${esc(nombre)}</td>
+                <td class="td-main"><span class="v c-neg">${f(mloss)}</span><br>${mlostLabel}</td>
+                ${cell(m.ev1, m.ev2)}
+                ${cell(m.pr1, m.pr2)}
+                ${cell(m.di1, m.di2)}
+                ${cell(m.pg1, m.pg2)}
+            </tr>`;
+            const prodsConPerdida = Object.entries(m.productos)
+                .filter(([,p]) => p.y1 < p.y2)
+                .sort((x,y) => (y[1].y2-y[1].y1) - (x[1].y2-x[1].y1));
+            prodsConPerdida.forEach(([,p]) => {
+                const ploss = p.y2-p.y1;
+                lostRows += `<tr class="tr-prod tr-lost-prod">
+                    <td class="td-name"><span class="indent-prod">·</span>${esc(p.nombre)}<span class="publi-tag">${esc(p.publi)}</span></td>
+                    <td class="td-main"><span class="v c-neg">${f(ploss)}</span><br>${pctStr(p.y1,p.y2)}</td>
+                    ${cell(p.ev1, p.ev2)}
+                    ${cell(p.pr1, p.pr2)}
+                    ${cell(p.di1, p.di2)}
+                    ${cell(p.pg1, p.pg2)}
+                </tr>`;
+            });
+        });
+    });
+
+    const nuevos = Object.entries(ads).filter(([,a])=>a.y1>0&&a.y2===0).sort((a,b)=>b[1].y1-a[1].y1).slice(0,10);
+    const nuevosRows = nuevos.map(([name,a],i)=>`
+        <tr><td>${i+1}. ${esc(name)} <span class="c-nuevo" style="font-size:9px;font-weight:700;">NUEVO</span></td>
+        <td class="tr">${f(a.y1)}</td><td class="tr">${f(a.ev1)}</td><td class="tr">${f(a.pr1)}</td><td class="tr">${f(a.di1)}</td><td class="tr">${f(a.pg1)}</td></tr>`).join('');
+
+    const crecen = Object.entries(ads).filter(([,a])=>a.y1>a.y2&&a.y2>0)
+        .map(([name,a])=>({name,a,diff:a.y1-a.y2,perc:(a.y1-a.y2)/a.y2*100}))
+        .sort((a,b)=>b.diff-a.diff).slice(0,10);
+    const crecRows = crecen.map(({name,a,diff,perc},i)=>`
+        <tr><td>${i+1}. ${esc(name)}</td>
+        <td class="tr"><strong>${f(a.y1)}</strong></td><td class="tr c-muted">${f(a.y2)}</td>
+        <td class="tr c-pos">+${f(diff)}</td>
+        <td class="tr"><span style="background:#1e3a8a;color:#bfdbfe;padding:2px 7px;border-radius:999px;font-size:9px;font-weight:800;">+${perc.toFixed(0)}%</span></td>
+        <td class="tr">${f(a.ev1)}</td><td class="tr">${f(a.pr1)}</td></tr>`).join('');
+
+    const filtrosStr = [
+        selAreas.size ? 'Áreas: '+[...selAreas].join(', ') : '',
+        selFamilias.size ? 'Familias: '+[...selFamilias].join(', ') : '',
+        selChannels.size ? 'Canales: '+[...selChannels].join(', ') : '',
+        document.getElementById('fPub').value !== 'TODOS' ? 'Pub: '+document.getElementById('fPub').value : '',
+        document.getElementById('fSector').value !== 'TODOS' ? 'Sector: '+document.getElementById('fSector').value : '',
+        selVista ? 'Vista: '+selVista : '',
+    ].filter(Boolean).join(' · ') || 'Sin filtros adicionales';
+
+    const fecha = new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
+
+    const win = window.open('','_blank','width=1200,height=800');
+    win.document.write(`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Ranking Anunciantes ${y1} vs ${y2}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;color:#111827;background:#fff;padding:24px 28px;}
+.print-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #e5e7eb;}
+.print-title{font-size:18px;font-weight:900;color:#111827;}
+.print-sub{font-size:10px;color:#6b7280;margin-top:4px;line-height:1.8;}
+.print-logo{font-size:13px;font-weight:900;color:#0891b2;white-space:nowrap;}
+.totals-bar{display:flex;gap:0;margin-bottom:16px;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;}
+.totals-cell{flex:1;padding:12px 16px;text-align:center;background:#f9fafb;}
+.totals-cell:nth-child(2){background:#fffbeb;border-left:1px solid #fde68a;border-right:1px solid #fde68a;}
+.totals-label{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#6b7280;font-weight:700;margin-bottom:4px;}
+.totals-val{font-size:18px;font-weight:900;color:#111827;}
+.sec-title{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#374151;margin:20px 0 8px;padding-bottom:6px;border-bottom:2px solid #e5e7eb;}
+table{width:100%;border-collapse:collapse;font-size:10px;}
+th{font-size:9px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.07em;padding:7px 10px;background:#f3f4f6;border-bottom:2px solid #d1d5db;text-align:center;white-space:nowrap;}
+th:first-child{text-align:left;min-width:220px;}
+td{padding:5px 10px;border-bottom:1px solid #f3f4f6;vertical-align:middle;text-align:center;}
+td:first-child{text-align:left;}
+td.td-main{background:#fffde7;border-left:1px solid #fde68a;border-right:1px solid #fde68a;}
+td.tr{text-align:right;}
+.v{font-weight:700;font-size:10px;}
+.tr-adv td{background:#f9fafb;}
+.tr-adv strong{font-size:11px;color:#111827;}
+.tr-marca td{background:#f0f9ff;}
+.tr-prod td{background:#fff;}
+.tr-lost-adv td{background:#fef2f2!important;}
+.tr-lost-marca td{background:#fff5f5!important;}
+.tr-lost-prod td{background:#fff!important;}
+.pos-num{color:#9ca3af;font-size:9px;margin-right:6px;font-weight:400;}
+.indent-marca{color:#6b7280;margin-right:4px;padding-left:14px;}
+.indent-prod{color:#d1d5db;margin-right:4px;padding-left:28px;font-size:13px;}
+.publi-tag{font-size:8px;font-weight:700;background:#dbeafe;color:#1e40af;padding:1px 5px;border-radius:4px;margin-left:5px;}
+.c-pos{color:#059669;font-weight:700;}
+.c-neg{color:#dc2626;font-weight:700;}
+.c-muted{color:#9ca3af;}
+.c-nuevo{color:#059669;background:#d1fae5;padding:1px 5px;border-radius:999px;font-size:8px;font-weight:800;}
+.c-perdido{color:#dc2626;background:#fee2e2;padding:1px 5px;border-radius:999px;font-size:8px;font-weight:800;}
+.tr-total td{background:#fffbeb;font-weight:800;border-top:2px solid #f59e0b;color:#92400e;}
+.footer{margin-top:16px;font-size:9px;color:#9ca3af;display:flex;justify-content:space-between;border-top:1px solid #e5e7eb;padding-top:8px;}
+@media print{body{padding:10px 14px;}@page{size:A4 landscape;margin:10mm 12mm;}}
+</style>
+</head>
+<body>
+<div class="print-header">
+  <div>
+    <div class="print-title">Ranking de Anunciantes — TOTAL HEARST</div>
+    <div class="print-sub">
+      Año base: <strong>${y1}</strong> · Año comparado: <strong>${y2}</strong><br>
+      ${filtrosStr}<br>
+      Generado el ${fecha}
+    </div>
+  </div>
+  <div class="print-logo">▸ HEARST</div>
+</div>
+<div class="totals-bar">
+  <div class="totals-cell">
+    <div class="totals-label">Total ${y2}</div>
+    <div class="totals-val">${f(totalY2)}</div>
+  </div>
+  <div class="totals-cell">
+    <div class="totals-label">Variación</div>
+    <div class="totals-val ${totalDiff>=0?'c-pos':'c-neg'}">${totalDiff>=0?'+':''}${totalPct.toFixed(1)}%</div>
+    <div class="totals-label" style="margin-top:2px;">${fSigned(totalDiff)}</div>
+  </div>
+  <div class="totals-cell">
+    <div class="totals-label">Total ${y1}</div>
+    <div class="totals-val">${f(totalY1)}</div>
+  </div>
+</div>
+<div class="sec-title">📊 Ranking completo · ${sorted.length} anunciantes${selVista?' ('+selVista+')':''}</div>
+<table>
+  <thead><tr>
+    <th style="text-align:left">Anunciante / Marca / Producto</th>
+    <th>Total ${y1}</th><th>Eventos</th><th>Print</th><th>Digital</th><th>Prog.</th>
+  </tr></thead>
+  <tbody>
+    ${rankingRows}
+    <tr class="tr-total"><td>TOTAL</td><td class="td-main"><span class="v">${f(totalY1)}</span></td><td></td><td></td><td></td><td></td></tr>
+  </tbody>
+</table>
+${lostRows_data.length ? `
+<div class="sec-title" style="color:#dc2626;border-color:#fca5a5;">🔴 Anunciantes que han bajado o desaparecido · ${lostRows_data.length}</div>
+<table>
+  <thead><tr>
+    <th style="text-align:left">Anunciante / Marca / Producto</th>
+    <th>Pérdida (${y2}→${y1})</th><th>Eventos</th><th>Print</th><th>Digital</th><th>Prog.</th>
+  </tr></thead>
+  <tbody>
+    ${lostRows}
+    <tr class="tr-total" style="background:#fef2f2!important;color:#991b1b;"><td>TOTAL BAJADA</td><td class="td-main" style="background:#fef2f2;"><span class="v c-neg">${f(lostTotalY2-lostTotalY1)}</span></td><td></td><td></td><td></td><td></td></tr>
+  </tbody>
+</table>` : ''}
+${nuevos.length ? `
+<div class="sec-title" style="color:#059669;border-color:#6ee7b7;">🟢 Top 10 nuevos anunciantes en ${y1}</div>
+<table>
+  <thead><tr><th style="text-align:left">Anunciante</th><th>Total ${y1}</th><th>Eventos</th><th>Print</th><th>Digital</th><th>Prog.</th></tr></thead>
+  <tbody>${nuevosRows}</tbody>
+</table>` : ''}
+${crecen.length ? `
+<div class="sec-title" style="color:#1d4ed8;border-color:#93c5fd;">📈 Top 10 mayor crecimiento</div>
+<table>
+  <thead><tr><th style="text-align:left">Anunciante</th><th>Total ${y1}</th><th>Total ${y2}</th><th>Δ €</th><th>Δ %</th><th>Eventos</th><th>Print</th></tr></thead>
+  <tbody>${crecRows}</tbody>
+</table>` : ''}
+<div class="footer">
+  <span>Ranking Anunciantes Hearst · ${y1} vs ${y2}</span>
+  <span>Impreso el ${new Date().toLocaleString('es-ES')}</span>
+</div>
+<script>window.onload=function(){window.print();}<\/script>
+</body>
+</html>`);
+    win.document.close();
+}
 
 </script>
 </body>
