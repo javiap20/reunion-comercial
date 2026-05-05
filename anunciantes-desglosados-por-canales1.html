@@ -1132,11 +1132,10 @@ tabLost.onclick = () => setView('lost');
 // Lógica:
 //   1. Se agrega el Excel PRINT Y DIGITAL igual que siempre.
 //   2. Se lee ANUNCIANTES PROGRAMATICA.xlsx:
-//      - columna "Anunciante"     → nombre del anunciante en PRINT Y DIGITAL (ej: GOOGLE)
-//      - columna "PROGR"          → anunciante real al que reasignar (ej: L'OREAL)
-//      - columna "Imp.Neto a Comisionar" → cantidad a mover
-//      - columna "Año inserción"  → año
-//      - columna "Mes inserción"  → mes
+//      - columna "Anunciante"          → anunciante origen en PRINT Y DIGITAL (ej: GOOGLE)
+//      - columna "PROGR"               → anunciante destino real (ej: L'OREAL)
+//      - columna "Imp.Neto a Comisionar" → importe año base (y1, ej: 2026)
+//      - columna "Imp.Neto Ant."       → importe año comparar (y2, ej: 2025)
 //   3. Para cada fila del Excel PROG:
 //      - Al anunciante ORIGEN (ej: GOOGLE) se le RESTA esa cantidad en pg1/pg2
 //      - Al anunciante DESTINO (ej: L'OREAL) se le SUMA esa cantidad en pg1/pg2
@@ -1193,42 +1192,38 @@ function renderProgDesglosada(progRows) {
     const MESES_LOCAL = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
 
     progRows.forEach(row => {
-        const origen    = String(row['Anunciante'] || '').trim().toUpperCase();   // ej: GOOGLE
-        const destino   = String(row['PROGR'] || '').trim().toUpperCase();         // ej: L'OREAL
-        const importe   = Number(String(row['Imp.Neto a Comisionar'] || 0).replace(/[^0-9.-]+/g, '')) || 0;
-        const anoStr    = String(row['Año inserción'] || row['AÑO INSERCION'] || '').trim();
-        const mesStr    = String(row['Mes inserción'] || row['MES INSERCION'] || '').trim().toUpperCase();
+        const origen  = String(row['Anunciante'] || '').trim().toUpperCase();  // ej: GOOGLE
+        const destino = String(row['PROGR'] || '').trim().toUpperCase();        // ej: L'OREAL
 
-        if (!origen || !destino || importe === 0 || !anoStr) return;
+        // Año base (y1)     → columna "Imp.Neto a Comisionar"
+        // Año comparar (y2) → columna "Imp.Neto Ant."
+        const importeY1 = Number(String(row['Imp.Neto a Comisionar'] || 0).replace(/[^0-9.-]+/g, '')) || 0;
+        const importeY2 = Number(String(row['Imp.Neto Ant.'] || row['Imp.Neto Ant'] || 0).replace(/[^0-9.-]+/g, '')) || 0;
 
-        // Determinar si corresponde a y1 o y2
-        const passM1 = selM1.size === 0 || MESES_LOCAL.some(m => mesStr.includes(m) && selM1.has(m));
-        const passM2 = selM2.size === 0 || MESES_LOCAL.some(m => mesStr.includes(m) && selM2.has(m));
-
-        let target = null;
-        if (anoStr === y1 && passM1) target = 'y1';
-        else if (anoStr === y2 && passM2) target = 'y2';
-        if (!target) return;
-
-        const pgKey = target === 'y1' ? 'pg1' : 'pg2';
-        const yKey  = target; // 'y1' o 'y2'
-
-        // ── RESTAR al anunciante ORIGEN (ej: GOOGLE) ──────────────────────────
-        if (ads[origen]) {
-            ads[origen][pgKey] = (ads[origen][pgKey] || 0) - importe;
-            ads[origen][yKey]  = (ads[origen][yKey]  || 0) - importe;
-            // Si pg queda negativo, poner a 0 (no puede haber programática negativa)
-            if (ads[origen][pgKey] < 0) ads[origen][pgKey] = 0;
-            if (ads[origen][yKey]  < 0) ads[origen][yKey]  = 0;
-        }
-
-        // ── SUMAR al anunciante DESTINO (ej: L'OREAL) ─────────────────────────
-        if (!destino || destino === '') return;
+        if (!origen || !destino) return;
         if (!ads[destino]) {
             ads[destino] = { y1:0,y2:0,ev1:0,ev2:0,pr1:0,pr2:0,di1:0,di2:0,pg1:0,pg2:0, marcas:{} };
         }
-        ads[destino][pgKey] = (ads[destino][pgKey] || 0) + importe;
-        ads[destino][yKey]  = (ads[destino][yKey]  || 0) + importe;
+
+        // ── Procesar año base (y1) ─────────────────────────────────────────────
+        if (importeY1 !== 0) {
+            if (ads[origen]) {
+                ads[origen].pg1 = Math.max(0, (ads[origen].pg1 || 0) - importeY1);
+                ads[origen].y1  = Math.max(0, (ads[origen].y1  || 0) - importeY1);
+            }
+            ads[destino].pg1 = (ads[destino].pg1 || 0) + importeY1;
+            ads[destino].y1  = (ads[destino].y1  || 0) + importeY1;
+        }
+
+        // ── Procesar año comparar (y2) ─────────────────────────────────────────
+        if (importeY2 !== 0) {
+            if (ads[origen]) {
+                ads[origen].pg2 = Math.max(0, (ads[origen].pg2 || 0) - importeY2);
+                ads[origen].y2  = Math.max(0, (ads[origen].y2  || 0) - importeY2);
+            }
+            ads[destino].pg2 = (ads[destino].pg2 || 0) + importeY2;
+            ads[destino].y2  = (ads[destino].y2  || 0) + importeY2;
+        }
     });
 
     // 3. Renderizar igual que renderRanking pero usando estos datos modificados
