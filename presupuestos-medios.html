@@ -258,7 +258,122 @@ td.avg-col { text-align: center; font-family: 'DM Mono', monospace; font-size: 1
 .sc-below { color: var(--coral); }
 .sc-equal { color: var(--text3); }
 
-/* TOOLTIP */
+/* IM TAB — Inserciones por Medio */
+.im-two-col {
+  display: grid;
+  grid-template-columns: 49% 49%;
+  gap: 0 2%;
+  align-items: start;
+}
+.im-col-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.09em; color: var(--text3);
+  padding: 10px 16px 8px;
+  background: #e8eaf0;
+  border-bottom: 2px solid #c8cad4;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  display: flex; align-items: center; gap: 8px;
+}
+.im-col-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+.im-wrap {
+  display: flex; flex-direction: column; gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+/* Medio row */
+.im-medio-row {
+  display: grid;
+  grid-template-columns: 1fr 70px 70px 60px 20px 95px 95px 65px;
+  align-items: center;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+  cursor: pointer;
+  transition: background 0.13s;
+  gap: 4px;
+}
+.im-medio-row:hover { background: #f0f4ff; }
+.im-medio-row.open  { background: #eef2ff; }
+
+.im-medio-name {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 600; font-size: 13px; color: var(--text);
+}
+.im-toggle { font-size: 10px; color: var(--text3); transition: transform 0.18s; flex-shrink: 0; }
+.im-toggle.open { transform: rotate(90deg); color: var(--accent); }
+
+.im-num { text-align: center; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 600; color: var(--text2); }
+.im-num.main { color: var(--accent); font-size: 13px; font-weight: 700; text-align: center; }
+.im-pct { text-align: center; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; display: block; }
+.im-pct.up   { color: var(--green); }
+.im-pct.down { color: var(--coral); }
+.im-pct.neutral { color: var(--text3); font-style: italic; font-size: 11px; }
+
+/* Column headers */
+.im-header-row {
+  display: grid;
+  grid-template-columns: 1fr 70px 70px 60px 20px 95px 95px 65px;
+  padding: 7px 14px;
+  background: #f0f1f6;
+  font-size: 9px; font-weight: 700; color: var(--text3);
+  text-transform: uppercase; letter-spacing: 0.07em;
+  border-bottom: 1px solid #dde0e8;
+  gap: 4px;
+}
+.im-header-row span { text-align: center; }
+.im-header-row span:first-child { text-align: left; }
+
+/* Family level */
+.im-fam-block { border-bottom: 1px solid var(--border); }
+.im-fam-block:last-child { border-bottom: none; }
+.im-fam-row {
+  display: grid;
+  grid-template-columns: 1fr 70px 70px 60px 20px 95px 95px 65px;
+  align-items: center;
+  padding: 8px 14px 8px 30px;
+  background: #f6f7fa;
+  cursor: pointer;
+  border-bottom: 1px solid #eaecf2;
+  gap: 4px;
+  transition: background 0.12s;
+}
+.im-fam-row:hover { background: #eef0f8; }
+.im-fam-row.open  { background: #e8edf8; }
+.im-fam-name {
+  display: flex; align-items: center; gap: 7px;
+  font-weight: 600; font-size: 12px; color: var(--text2);
+}
+.im-fam-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+/* Product level */
+.im-prod-row {
+  display: grid;
+  grid-template-columns: 1fr 70px 70px 60px 20px 95px 95px 65px;
+  align-items: center;
+  padding: 6px 14px 6px 48px;
+  background: #fafbfd;
+  border-bottom: 1px solid #eef0f5;
+  gap: 4px;
+}
+.im-prod-row:last-child { border-bottom: none; }
+.im-prod-name { font-size: 11px; color: var(--text2); display: flex; align-items: center; gap: 6px; }
+.im-prod-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text3); flex-shrink: 0; }
+.im-prod-num { text-align: center; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text2); }
+.im-prod-pct { text-align: center; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 600; }
+.im-prod-pct.up   { color: var(--green); }
+.im-prod-pct.down { color: var(--coral); }
+.im-prod-pct.neutral { color: var(--text3); font-style: italic; }
+
+/* IM hidden containers */
+.im-fam-block > .im-fam-children { display: none; }
+.im-fam-block > .im-fam-children.open { display: block; }
+.im-medio-block > .im-medio-children { display: none; }
+.im-medio-block > .im-medio-children.open { display: block; }
+
 .tooltip-wrap { position: relative; display: inline-block; }
 .tt-trigger {
   display: inline-flex; align-items: center; justify-content: center;
@@ -288,6 +403,14 @@ td.avg-col { text-align: center; font-family: 'DM Mono', monospace; font-size: 1
 .tt-equal { color: #9999bb; }
 .tt-avg-line { margin-top: 8px; padding-top: 7px; border-top: 1.5px solid rgba(125,211,252,0.35); font-size: 10px; color: #7dd3fc; font-weight: 600; letter-spacing: 0.04em; display: flex; justify-content: space-between; }
 .tt-avg-line span { font-family: 'DM Mono', monospace; color: #aaaacc; font-weight: 600; }
+
+.im-separator {
+  width: 1px;
+  background: #d0d0d0;
+  height: 100%;
+  min-height: 20px;
+  justify-self: center;
+}
 </style>
 </head>
 <body>
@@ -327,6 +450,7 @@ td.avg-col { text-align: center; font-family: 'DM Mono', monospace; font-size: 1
   <div class="tab-bar">
     <button class="tab-btn active" id="tab-pm" onclick="switchTab('pm')">📊 Precios Medios</button>
     <button class="tab-btn" id="tab-pd" onclick="switchTab('pd')">📈 Productos Desglosados</button>
+    <button class="tab-btn" id="tab-im" onclick="switchTab('im')">🗞️ Inserciones por Medio</button>
   </div>
 
   <div class="filter-block">
@@ -380,7 +504,7 @@ td.avg-col { text-align: center; font-family: 'DM Mono', monospace; font-size: 1
       <span class="info-icon">💡</span>
       <span id="info-text"></span>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap" id="table-wrap">
       <div class="table-scroll">
         <table>
           <thead id="thead"></thead>
@@ -388,6 +512,7 @@ td.avg-col { text-align: center; font-family: 'DM Mono', monospace; font-size: 1
         </table>
       </div>
     </div>
+    <div class="table-wrap" id="im-container" style="display:none;overflow:hidden;"></div>
   </div>
 </div>
 
@@ -420,6 +545,7 @@ function switchTab(tab) {
   activeTab = tab;
   document.getElementById('tab-pm').classList.toggle('active', tab === 'pm');
   document.getElementById('tab-pd').classList.toggle('active', tab === 'pd');
+  document.getElementById('tab-im').classList.toggle('active', tab === 'im');
   renderTable();
 }
 
@@ -550,6 +676,10 @@ function setZeroMode(mode) {
   document.getElementById('btn-con-ceros').classList.toggle('active', mode === 'con');
   document.getElementById('btn-sin-ceros').classList.toggle('active', mode === 'sin');
   renderTable();
+  // También actualizar Inserciones por Medio si está visible
+  if (document.getElementById('im-container').style.display !== 'none') {
+    renderIM();
+  }
 }
 
 // ─── FILTER ───────────────────────────────────────────────────────────────────
@@ -566,6 +696,10 @@ function getFiltered() {
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
 function renderTable() {
+  if (activeTab === 'im') { renderIM(); return; }
+  // Standard tabs: ensure table visible, IM container hidden
+  document.getElementById('table-wrap').style.display = '';
+  document.getElementById('im-container').style.display = 'none';
   const rows   = getFiltered();
   const search = document.getElementById('f-search').value.toLowerCase().trim();
   const sortBy = document.getElementById('f-sort').value;
@@ -875,6 +1009,239 @@ function renderTable() {
   });
   tbody.innerHTML = html;
   document.addEventListener('click', closeTipsOutside, { once: false });
+}
+
+// ─── IM — INSERCIONES POR MEDIO ──────────────────────────────────────────────
+function renderIM() {
+  const yr    = document.getElementById('f-year').value;
+  const canal = document.getElementById('f-canal').value;
+
+  // Show/hide correct containers
+  document.getElementById('table-wrap').style.display = 'none';
+  document.getElementById('im-container').style.display = '';
+
+  // Filter current year
+  // Productos excluidos (gastos)
+  const excludedProducts = [
+    'Article (Production Cost)',
+    'Content Ignition',
+    'COSTES FABRICACION PRODUCCION',
+    'COSTES REALIZACION',
+    'Gastos Ejecución (Production Cost)'
+  ];
+
+  const rowsY1 = DATA.filter(r => {
+    if (yr !== 'all' && r._year !== yr) return false;
+    if (canal !== 'all' && r._canal !== canal) return false;
+    if (selectedMonths.size > 0 && !selectedMonths.has(r._mes)) return false;
+    if (excludedProducts.includes(r._prod)) return false;
+    // Filtro de líneas a 0€
+    if (zeroMode === 'sin' && (parseFloat(r._ingreso) || 0) === 0) return false;
+    return true;
+  });
+
+  // Filter previous year
+  let rowsY0 = [];
+  let prevYrLabel = '';
+  if (yr !== 'all') {
+    prevYrLabel = String(parseInt(yr, 10) - 1);
+    rowsY0 = DATA.filter(r => {
+      if (r._year !== prevYrLabel) return false;
+      if (canal !== 'all' && r._canal !== canal) return false;
+      if (selectedMonths.size > 0 && !selectedMonths.has(r._mes)) return false;
+      if (excludedProducts.includes(r._prod)) return false;
+      // Filtro de líneas a 0€
+      if (zeroMode === 'sin' && (parseFloat(r._ingreso) || 0) === 0) return false;
+      return true;
+    });
+  }
+
+  // ── Classify a publication name as web or revista ──
+  // Webs: start with "www." (case-insensitive) or contain a dot after the first word
+  function isWeb(pub) {
+    const p = (pub || '').trim().toLowerCase();
+    return p.startsWith('www.');
+  }
+
+  // ── Aggregate tree: medio → familia → producto ──
+  function buildTree(rows) {
+    const tree = {};
+    rows.forEach(r => {
+      const medio = r._pub || '(sin publicación)';
+      const fam   = r._fam || '(sin familia)';
+      const prod  = r._prod || '(sin producto)';
+      const ing   = parseFloat(r._ingreso) || 0;
+      if (!tree[medio]) tree[medio] = { n: 0, ing: 0, fams: {} };
+      tree[medio].n++;
+      tree[medio].ing += ing;
+      if (!tree[medio].fams[fam]) tree[medio].fams[fam] = { n: 0, ing: 0, prods: {} };
+      tree[medio].fams[fam].n++;
+      tree[medio].fams[fam].ing += ing;
+      if (!tree[medio].fams[fam].prods[prod]) tree[medio].fams[fam].prods[prod] = { n: 0, ing: 0 };
+      tree[medio].fams[fam].prods[prod].n++;
+      tree[medio].fams[fam].prods[prod].ing += ing;
+    });
+    return tree;
+  }
+
+  const treeY1 = buildTree(rowsY1);
+  const treeY0 = buildTree(rowsY0);
+
+  const allMedios = [...new Set([...Object.keys(treeY1), ...Object.keys(treeY0)])].sort();
+  const revistas  = allMedios.filter(m => !isWeb(m));
+  const webs      = allMedios.filter(m =>  isWeb(m));
+
+  // Summary cards (all medios combined)
+  const totalLinY1 = rowsY1.length;
+  const totalLinY0 = rowsY0.length;
+  const diffTot    = totalLinY1 - totalLinY0;
+  const pctTot     = totalLinY0 > 0 ? (diffTot / totalLinY0) * 100 : null;
+
+  document.getElementById('summary-bar').innerHTML = `
+    <div class="summary-card accent"><div class="s-val">${fmtNum(revistas.length)}</div><div class="s-label">revistas</div></div>
+    <div class="summary-card" style="border-top:3px solid var(--purple)"><div class="s-val">${fmtNum(webs.length)}</div><div class="s-label">webs</div></div>
+    <div class="summary-card purple"><div class="s-val">${fmtNum(totalLinY1)}</div><div class="s-label">líneas ${yr !== 'all' ? yr : 'totales'}</div></div>
+    ${yr !== 'all' ? `<div class="summary-card ${diffTot >= 0 ? 'green' : 'amber'}">
+      <div class="s-val" style="color:${diffTot >= 0 ? 'var(--green)' : 'var(--coral)'};">${diffTot >= 0 ? '+' : ''}${fmtNum(diffTot)}</div>
+      <div class="s-label">vs ${prevYrLabel} (${pctTot !== null ? (pctTot >= 0 ? '+' : '') + pctTot.toFixed(1) + '%' : '—'})</div>
+    </div>` : ''}
+    ${yr !== 'all' ? `<div class="summary-card"><div class="s-val mono">${fmtNum(totalLinY0)}</div><div class="s-label">líneas ${prevYrLabel}</div></div>` : ''}`;
+
+  // Info note
+  const note = document.getElementById('info-note');
+  note.classList.remove('hidden');
+  document.getElementById('info-text').innerHTML = yr !== 'all'
+    ? `<strong>Inserciones por Medio.</strong> Revistas (izquierda) y webs (derecha), con desglose por familia y producto. Comparativa con ${prevYrLabel}. Haz clic en ▶ para desplegar.`
+    : '<strong>Inserciones por Medio.</strong> Revistas (izquierda) y webs (derecha). Selecciona un año concreto para ver la comparativa interanual.';
+
+  // Helper: % change badge
+  function pctBadge(y1, y0) {
+    if (yr === 'all') return `<span class="im-pct neutral">—</span>`;
+    if (y0 === 0 && y1 > 0) return `<span class="im-pct up">NUEVO</span>`;
+    if (y1 === 0 && y0 > 0) return `<span class="im-pct down">−100%</span>`;
+    if (y0 === 0 && y1 === 0) return `<span class="im-pct neutral">—</span>`;
+    const diff = y1 - y0, pct = (diff / y0) * 100;
+    const sign = diff >= 0 ? '+' : '';
+    const cls  = diff > 0 ? 'up' : diff < 0 ? 'down' : 'neutral';
+    return `<span class="im-pct ${cls}">${sign}${pct.toFixed(1)}%</span>`;
+  }
+
+  // ── Build one column's HTML ──
+  const prevColLabel = yr !== 'all' ? `Líneas ${prevYrLabel}` : '';
+
+  function buildColumnHtml(medioList, colId) {
+    const isRev   = colId === 'rev';
+    const color   = isRev ? '#2563eb' : '#7c3aed';
+    const emoji   = isRev ? '📰' : '🌐';
+    const label   = isRev ? 'Revistas' : 'Webs';
+    const shadow  = isRev ? 'rgba(37,99,235,0.2)' : 'rgba(124,58,237,0.2)';
+    const headerBg = isRev ? '#eff4ff' : '#f5f0ff';
+    const headerBorder = isRev ? '#c7d9ff' : '#ddd0ff';
+
+    let html = `<div class="im-wrap">
+      <div style="padding:10px 16px 9px; background:${headerBg}; border-bottom:2px solid ${headerBorder}; display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.09em; color:#5a5a7a;">
+        <span style="width:8px;height:8px;border-radius:50%;background:${color};box-shadow:0 0 0 2px ${shadow};flex-shrink:0;display:inline-block;"></span>
+        ${emoji} ${label} <span style="font-weight:400;opacity:0.55;margin-left:4px;">(${medioList.length})</span>
+      </div>
+      <div class="im-header-row">
+        <span>Publicación / Familia / Producto</span>
+        <span>Líneas ${yr !== 'all' ? yr : ''}</span>
+        <span>${prevColLabel}</span>
+        <span>% var.</span>
+        <span class="im-separator"></span>
+        <span>Ingreso ${yr !== 'all' ? yr : ''}</span>
+        <span>Ingreso ${prevColLabel}</span>
+        <span>% var.</span>
+      </div>`;
+
+    medioList.forEach((medio, mi) => {
+      const y1Data = treeY1[medio] || { n: 0, fams: {} };
+      const y0Data = treeY0[medio] || { n: 0, fams: {} };
+      const nY1 = y1Data.n, nY0 = y0Data.n;
+      const medioId = `im-${colId}-medio-${mi}`;
+
+      const allFams = [...new Set([...Object.keys(y1Data.fams), ...Object.keys(y0Data.fams)])].sort();
+
+      const famBlocksHtml = allFams.map((fam, fi) => {
+        const fY1 = y1Data.fams[fam] || { n: 0, prods: {} };
+        const fY0 = y0Data.fams[fam] || { n: 0, prods: {} };
+        const fnY1 = fY1.n, fnY0 = fY0.n;
+        const famId = `im-${colId}-fam-${mi}-${fi}`;
+
+        const allProds = [...new Set([...Object.keys(fY1.prods), ...Object.keys(fY0.prods)])].sort();
+        const prodsHtml = allProds.map(prod => {
+          const pDataY1 = fY1.prods[prod] || { n: 0, ing: 0 };
+          const pDataY0 = fY0.prods[prod] || { n: 0, ing: 0 };
+          const pY1 = pDataY1.n, pY0 = pDataY0.n;
+          const pIngY1 = Math.round(pDataY1.ing), pIngY0 = Math.round(pDataY0.ing);
+          return `<div class="im-prod-row">
+            <div class="im-prod-name"><span class="im-prod-dot"></span>${prod}</div>
+            <div class="im-prod-num">${fmtNum(pY1)}</div>
+            <div class="im-prod-num">${yr !== 'all' ? fmtNum(pY0) : ''}</div>
+            <div>${pctBadge(pY1, pY0)}</div>
+            <div class="im-separator"></div>
+            <div class="im-prod-num">${fmtNum(pIngY1)}€</div>
+            <div class="im-prod-num">${yr !== 'all' ? fmtNum(pIngY0) + '€' : ''}</div>
+            <div>${pctBadge(pIngY1, pIngY0)}</div>
+          </div>`;
+        }).join('');
+
+        const fIngY1 = Math.round(fY1.ing || 0), fIngY0 = Math.round(fY0.ing || 0);
+        return `<div class="im-fam-block">
+          <div class="im-fam-row" onclick="toggleIM('${famId}')">
+            <div class="im-fam-name">
+              <span class="im-toggle" id="imtog-${famId}">▶</span>
+              <span class="im-fam-dot"></span>${fam}
+            </div>
+            <div class="im-num">${fmtNum(fnY1)}</div>
+            <div class="im-num">${yr !== 'all' ? fmtNum(fnY0) : ''}</div>
+            <div>${pctBadge(fnY1, fnY0)}</div>
+            <div class="im-separator"></div>
+            <div class="im-num">${fmtNum(fIngY1)}€</div>
+            <div class="im-num">${yr !== 'all' ? fmtNum(fIngY0) + '€' : ''}</div>
+            <div>${pctBadge(fIngY1, fIngY0)}</div>
+          </div>
+          <div class="im-fam-children" id="${famId}">${prodsHtml}</div>
+        </div>`;
+      }).join('');
+
+      const ingY1 = Math.round(y1Data.ing || 0), ingY0 = Math.round(y0Data.ing || 0);
+      html += `<div class="im-medio-block">
+        <div class="im-medio-row" onclick="toggleIM('${medioId}')">
+          <div class="im-medio-name">
+            <span class="im-toggle" id="imtog-${medioId}">▶</span>
+            <strong>${medio}</strong>
+          </div>
+          <div class="im-num main">${fmtNum(nY1)}</div>
+          <div class="im-num">${yr !== 'all' ? fmtNum(nY0) : ''}</div>
+          <div>${pctBadge(nY1, nY0)}</div>
+          <div class="im-separator"></div>
+          <div class="im-num main">${fmtNum(ingY1)}€</div>
+          <div class="im-num">${yr !== 'all' ? fmtNum(ingY0) + '€' : ''}</div>
+          <div>${pctBadge(ingY1, ingY0)}</div>
+        </div>
+        <div class="im-medio-children" id="${medioId}">${famBlocksHtml}</div>
+      </div>`;
+    });
+
+    html += `</div>`;
+    return html;
+  }
+
+  // ── Render both columns ──
+  document.getElementById('im-container').innerHTML = `
+    <div class="im-two-col">
+      <div>${buildColumnHtml(revistas, 'rev')}</div>
+      <div>${buildColumnHtml(webs, 'web')}</div>
+    </div>`;
+}
+
+function toggleIM(id) {
+  const el  = document.getElementById(id);
+  const tog = document.getElementById('imtog-' + id);
+  if (!el) return;
+  const isOpen = el.classList.toggle('open');
+  if (tog) tog.classList.toggle('open', isOpen);
 }
 
 // ─── TOOLTIP HELPERS ──────────────────────────────────────────────────────────
