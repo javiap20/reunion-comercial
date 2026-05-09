@@ -1167,9 +1167,33 @@ th.th-yoy {
         <div class="chart-card" style="padding:0;overflow:hidden">
           <div style="padding:12px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
             <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--green);flex-shrink:0"></span>
-            <span style="font-size:12px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:0.07em;flex:1;font-family:'Syne',sans-serif">📰 Print / Revistas (sin ingreso de EVENTOS)</span>
+            <span style="font-size:12px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:0.07em;flex:1;font-family:'Syne',sans-serif">📰 Print / Revistas</span>
           </div>
           <div id="mc-pubprint-table"></div>
+        </div>
+
+      </div>
+
+      <!-- ─── TABLA PUBLICACIONES: EVENTOS + PRINT+EVENTOS ─── -->
+      <div class="charts-row" style="align-items:start">
+
+        <!-- Card EVENTOS -->
+        <div class="chart-card" style="padding:0;overflow:hidden">
+          <div style="padding:12px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:linear-gradient(90deg,rgba(234,88,12,0.08) 0%,transparent 100%)">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#ea580c;flex-shrink:0"></span>
+            <span style="font-size:12px;font-weight:600;color:#ea580c;text-transform:uppercase;letter-spacing:0.07em;flex:1;font-family:'Syne',sans-serif">🎪 Eventos</span>
+            <span style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace" id="mc-pubeve-year-label"></span>
+          </div>
+          <div id="mc-pubeve-table"></div>
+        </div>
+
+        <!-- Card PRINT + EVENTOS -->
+        <div class="chart-card" style="padding:0;overflow:hidden">
+          <div style="padding:12px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:linear-gradient(90deg,rgba(168,85,247,0.08) 0%,transparent 100%)">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#a855f7;flex-shrink:0"></span>
+            <span style="font-size:12px;font-weight:600;color:#a855f7;text-transform:uppercase;letter-spacing:0.07em;flex:1;font-family:'Syne',sans-serif">📰🎪 Print + Eventos</span>
+          </div>
+          <div id="mc-pubprinteve-table"></div>
         </div>
 
       </div>
@@ -2227,6 +2251,8 @@ function renderMain(){
   mRenderMCTable('mc-sector-table','mc-sector-year-label',filt,hasPrev?prevFilt:null,yr,'sector');
   mRenderMCTable('mc-pubdig-table','mc-pubs-year-label',filt,hasPrev?prevFilt:null,yr,'pubdig');
   mRenderMCTable('mc-pubprint-table',null,filt,hasPrev?prevFilt:null,yr,'pubprint');
+  mRenderMCTable('mc-pubeve-table','mc-pubeve-year-label',filt,hasPrev?prevFilt:null,yr,'pubeve');
+  mRenderMCTable('mc-pubprinteve-table',null,filt,hasPrev?prevFilt:null,yr,'pubprinteve');
   mRenderTable(filt,yr);
   updateTabCounts();
   // Sincronizar Alertas con los filtros compartidos
@@ -2342,6 +2368,21 @@ function mRenderDonut(data){
 
 // ══════════════════════════════════════════════════════════════════════════════
 // MULTI-CANAL TABLE
+// ── Helpers para normalización de nombres de publicación en bloques Eventos/PrintEve ──
+function normApos(s){ return s.replace(/[\u00b4\u2018\u2019\u02bc`]/g,"'"); }
+function cleanFromCanon(canon){
+  // Convierte "HARPER'S BAZAAR" → "Harper's Bazaar"
+  return canon.toLowerCase().replace(/(?:^|\s)\S/g,c=>c.toUpperCase());
+}
+function canonEventoPub(raw){
+  if(!raw) return '—';
+  const up=normApos(raw.trim().toUpperCase());
+  if(BC_PRINT_CANON[up]) return cleanFromCanon(BC_PRINT_CANON[up]);
+  // Si no está en el canon, aplicar cleanPubName estándar
+  const s=raw.trim();
+  return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase();
+}
+
 // mode: 'mes' | 'area' | 'pubdig' | 'pubprint' | 'sector'
 // Δ% = variación vs año anterior — verde positivo, rojo negativo — directo en td
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2365,18 +2406,29 @@ function mRenderMCTable(elId,labelId,filt,prevFilt,yr,mode){
     if(mode==='area') return mapAreaGroup(r._area||'');
     if(mode==='pubdig') return r._canal==='DIGITAL'?(r._pubClean||r._pubNorm||r._pub||'—'):null;
     if(mode==='pubprint') return r._canal==='PRINT'?(r._pubClean||r._pubNorm||r._pub||'—'):null;
+    if(mode==='pubeve') return r._canal==='EVENTOS'?(canonEventoPub(r._pub)||'—'):null;
+    if(mode==='pubprinteve'){
+      if(r._canal==='PRINT'){const up=normApos((r._pub||'').trim().toUpperCase());return BC_PRINT_CANON[up]?cleanFromCanon(BC_PRINT_CANON[up]):r._pubClean||r._pubNorm||r._pub||'—';}
+      if(r._canal==='EVENTOS'){const up=normApos((r._pub||'').trim().toUpperCase());return BC_PRINT_CANON[up]?cleanFromCanon(BC_PRINT_CANON[up]):canonEventoPub(r._pub)||'—';}
+      return null;
+    }
     if(mode==='sector') return r._sectorClean||'—';
     return '—';
   }
 
-  const isPub=(mode==='pubdig'||mode==='pubprint');
-  const activeCanalForMode=mode==='pubdig'?'DIGITAL':mode==='pubprint'?'PRINT':null;
-  const allCanales=['TOTAL','DIGITAL','PRINT','EVENTOS'];
+  const isPub=(mode==='pubdig'||mode==='pubprint'||mode==='pubeve'||mode==='pubprinteve');
+  const activeCanalForMode=mode==='pubdig'?'DIGITAL':mode==='pubprint'?'PRINT':mode==='pubeve'?'EVENTOS':mode==='pubprinteve'?'PRINTEVE':null;
+  const allCanales=mode==='pubprinteve'?['TOTAL','DIGITAL','PRINT','EVENTOS','PRINTEVE']:['TOTAL','DIGITAL','PRINT','EVENTOS'];
 
   function buildMap(rows,canal){
     const m=new Map();
-    const rowsC=canal==='TOTAL'?rows:rows.filter(r=>r._canal===canal);
-    rowsC.forEach(r=>{const k=getRowKey(r);if(k) m.set(k,(m.get(k)||0)+r._ingreso);});
+    if(canal==='PRINTEVE'){
+      // Suma PRINT + EVENTOS usando la misma clave de fila
+      rows.filter(r=>r._canal==='PRINT'||r._canal==='EVENTOS').forEach(r=>{const k=getRowKey(r);if(k) m.set(k,(m.get(k)||0)+r._ingreso);});
+    } else {
+      const rowsC=canal==='TOTAL'?rows:rows.filter(r=>r._canal===canal);
+      rowsC.forEach(r=>{const k=getRowKey(r);if(k) m.set(k,(m.get(k)||0)+r._ingreso);});
+    }
     return m;
   }
   const curMaps={},prevMaps={};
