@@ -1009,8 +1009,8 @@ th.th-yoy {
         </div>
         <div class="worst-card">
           <div class="worst-card-header">
-            <div class="worst-card-title">🔴 Peores presupuestos medios por Producto y Publicación</div>
-            <div class="worst-card-sub">PM = Ingreso neto ÷ nº líneas · Producto × Publicación</div>
+            <div class="worst-card-title">🔴 Mayor caída de ingreso por Producto y Publicación</div>
+            <div class="worst-card-sub">€ caídos año actual vs anterior · Producto × Publicación</div>
           </div>
           <div class="worst-col-labels">
             <span class="wcl-name">Producto / Publicación</span>
@@ -1813,7 +1813,7 @@ let _popData=[];
 function renderWorst(base,comp){
   renderWorstSectorSite('w-sector-site',base,comp);
   renderWorstSectorArea('w-pm-prod',base,comp);
-  renderWorstPM('w-pm-prod-site',base,comp,r=>`${r._prod}|||${r._pub}`,it=>{const[a,b]=it.k.split('|||');return{name:a,sub:b};});
+  renderWorstProdCaida('w-pm-prod-site',base,comp);
 }
 function renderWorstSectorSite(elId,base,comp){
   _popData=[];
@@ -1858,22 +1858,34 @@ function renderWorstSectorArea(elId,base,comp){
   });
   document.getElementById(elId).innerHTML=html||'<div class="empty-msg">Sin datos comparables</div>';
 }
-function renderWorstPM(elId,base,comp,keyFn,labelFn){
-  const bMap=aggMean(base,keyFn),cMap=aggMean(comp,keyFn);
-  const allKeys=new Set([...bMap.keys(),...cMap.keys()]);
-  let items=[];
-  allKeys.forEach(k=>{if(!k) return;const bg=bMap.get(k),cg=cMap.get(k);if(!bg||!cg) return;const bPM=bg.sum/bg.count,cPM=cg.sum/cg.count,diff=bPM-cPM,p=cPM!==0?calcPct(bPM,cPM):null;if(p===null) return;const{name,sub}=labelFn({k});items.push({name,sub,bPM,cPM,diff,p});});
-  items.sort((a,b)=>a.diff-b.diff);
-  const worst=items.slice(0,30);
-  const maxAbs=Math.max(...worst.map(it=>Math.abs(it.diff)),1);
-  let html='';
-  worst.forEach((it,i)=>{
-    const barW=Math.min(100,(Math.abs(it.diff)/maxAbs)*100);
-    const valCol=`<span class="w-val-neg">${fmt(it.bPM)} <span class="w-vs">vs ${fmt(it.cPM)}</span></span>`;
-    const pctCol=`<span class="w-pct ${it.p>=0?'w-pos':'w-neg'}">${fmtPct(it.p)}</span>`;
-    html+=`<div class="worst-row2"><span class="w-num">${i+1}</span><div class="w-info"><div class="w-name">${it.name}</div>${it.sub?`<div class="w-sub">${it.sub}</div>`:''}<div class="w-bar-wrap"><div class="w-bar ${it.diff>=0?'w-bar-pos':''}" style="width:${barW}%"></div></div></div>${valCol}${pctCol}</div>`;
+function renderWorstProdCaida(elId, base, comp) {
+  const keyFn = r => `${r._prod}|||${r._pub}`;
+  const bMap = aggSum(base, keyFn), cMap = aggSum(comp, keyFn);
+  const allKeys = new Set([...bMap.keys(), ...cMap.keys()]);
+  let items = [];
+  allKeys.forEach(k => {
+    if (!k) return;
+    const parts = k.split('|||');
+    const prod = parts[0], pub = parts[1];
+    if (!prod || !pub) return;
+    const bv = bMap.get(k) || 0, cv = cMap.get(k) || 0;
+    if (cv === 0) return; // sin dato el año anterior, no comparable
+    const diff = bv - cv;
+    if (diff >= 0) return; // solo caídas
+    const p = calcPct(bv, cv);
+    items.push({ prod, pub, bv, cv, diff, p });
   });
-  document.getElementById(elId).innerHTML=html||'<div class="empty-msg">Sin datos comparables</div>';
+  items.sort((a, b) => a.diff - b.diff); // más negativo primero = mayor caída en €
+  const worst = items.slice(0, 30);
+  const maxAbs = Math.max(...worst.map(it => Math.abs(it.diff)), 1);
+  let html = '';
+  worst.forEach((it, i) => {
+    const barW = Math.min(100, (Math.abs(it.diff) / maxAbs) * 100);
+    const diffCol = `<span class="w-val-neg">${fmt(it.diff)}</span>`;
+    const vsCol = `<span class="w-pct w-neg">${fmtPct(it.p)}</span>`;
+    html += `<div class="worst-row2"><span class="w-num">${i+1}</span><div class="w-info"><div class="w-name">${it.prod}</div><div class="w-sub">${it.pub}</div><div class="w-bar-wrap"><div class="w-bar" style="width:${barW}%"></div></div></div>${diffCol}${vsCol}</div>`;
+  });
+  document.getElementById(elId).innerHTML = html || '<div class="empty-msg">Sin datos comparables</div>';
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
