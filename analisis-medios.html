@@ -1,0 +1,1728 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Análisis de Medios</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f4f5f7;
+  --bg2: #ffffff;
+  --bg3: #f0f1f4;
+  --bg4: #e4e6ec;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.13);
+  --text: #1a1a2e;
+  --text2: #3a3a5c;
+  --text3: #7a7a9a;
+  --accent: #2563eb;
+  --accent2: #1d4ed8;
+  --green: #16a34a;
+  --coral: #dc2626;
+  --amber: #b45309;
+  --purple: #7c3aed;
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+.mono { font-family: 'DM Mono', monospace; }
+
+/* TOPBAR */
+.topbar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+.topbar-brand {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.topbar-brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; }
+.data-badge {
+  font-size: 11px; color: var(--text3);
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 6px; padding: 3px 10px;
+  font-family: 'DM Mono', monospace;
+}
+
+/* TABS */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  background: var(--bg2);
+  border-bottom: 2px solid var(--border);
+  padding: 0 24px;
+  position: sticky;
+  top: 56px;
+  z-index: 99;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.tab-btn {
+  padding: 12px 22px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  border: none;
+  background: none;
+  color: var(--text3);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+  letter-spacing: -0.1px;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab-btn:hover { color: var(--text2); }
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* UPLOAD AREA */
+.upload-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 56px);
+  gap: 20px;
+}
+.loading-state { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 40px; }
+.spinner { width: 40px; height: 40px; border: 3px solid var(--bg4); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 14px; color: var(--text3); }
+.upload-zone {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  border: 1.5px dashed var(--border2); border-radius: 16px;
+  padding: 36px 48px; text-align: center; cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  background: var(--bg2); max-width: 380px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: rgba(37,99,235,0.03); }
+.upload-zone .up-icon { font-size: 36px; }
+.upload-zone .up-title { font-size: 16px; font-weight: 600; color: var(--text); }
+.upload-zone .up-sub { font-size: 12px; color: var(--text3); line-height: 1.7; }
+.upload-zone .up-btn {
+  background: var(--accent2); color: #fff; border: none;
+  border-radius: 8px; padding: 10px 24px;
+  font-size: 14px; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; font-weight: 500; transition: background 0.15s;
+}
+.upload-zone .up-btn:hover { background: var(--accent); }
+
+/* CONTROLS */
+#controls { display: none; }
+.filter-block { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 14px 24px; }
+.filter-block-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text3); font-weight: 500; margin-bottom: 10px; }
+.filters-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.filter-group { display: flex; flex-direction: column; gap: 4px; }
+.filter-group label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); font-weight: 500; }
+.filter-group select, .filter-group input {
+  background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--radius);
+  color: var(--text); padding: 7px 12px; font-size: 13px; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; outline: none; min-width: 140px;
+}
+.filter-group select:focus, .filter-group input:focus { border-color: var(--accent); }
+.filter-group input { min-width: 200px; }
+.months-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.month-chip {
+  display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 20px;
+  font-size: 13px; font-weight: 500; cursor: pointer; border: 1.5px solid var(--border2);
+  background: var(--bg3); color: var(--text2); user-select: none; transition: all 0.13s;
+  -webkit-tap-highlight-color: transparent; white-space: nowrap;
+}
+.month-chip:hover { border-color: var(--accent); background: rgba(37,99,235,0.05); }
+.month-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.month-chip.chip-all { font-style: italic; color: var(--text3); }
+.month-chip.chip-all.active { background: var(--bg4); border-color: var(--border2); color: var(--text2); font-style: normal; font-weight: 500; }
+.zero-toggle-wrap { display: flex; border: 1.5px solid var(--border2); border-radius: var(--radius); overflow: hidden; align-self: flex-end; }
+.zero-btn { padding: 7px 14px; font-size: 12px; font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; background: var(--bg3); color: var(--text3); font-weight: 500; transition: all 0.15s; white-space: nowrap; -webkit-tap-highlight-color: transparent; line-height: 1.4; text-align: center; }
+.zero-btn:first-child { border-right: 1px solid var(--border2); }
+.zero-btn.active { background: var(--accent); color: #fff; font-weight: 600; }
+.zero-btn:not(.active):hover { background: var(--bg4); color: var(--text2); }
+
+/* MAIN */
+#filters-sticky {
+  position: sticky;
+  top: 105px; /* topbar 56px + tab-bar ~49px */
+  z-index: 98;
+  background: var(--bg2);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+}
+.main { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.summary-bar { display: flex; flex-wrap: wrap; gap: 12px; }
+.summary-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 20px; display: flex; flex-direction: column; gap: 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); flex: 1; min-width: 140px; }
+.summary-card .s-val { font-size: 22px; font-weight: 600; font-family: 'DM Mono', monospace; color: var(--text); letter-spacing: -0.5px; }
+.summary-card .s-label { font-size: 11px; color: var(--text3); }
+.summary-card.accent { border-top: 3px solid var(--accent); }
+.summary-card.green  { border-top: 3px solid var(--green); }
+.summary-card.amber  { border-top: 3px solid var(--amber); }
+.summary-card.purple { border-top: 3px solid var(--purple); }
+.info-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius); padding: 10px 14px; font-size: 12px; color: #1e40af; display: flex; gap: 8px; align-items: flex-start; }
+.info-note.hidden { display: none; }
+.info-note .info-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+
+/* TABLE */
+.table-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: visible; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.table-scroll { overflow-x: auto; border-radius: var(--radius-lg); }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead tr { }
+th {
+  background: #e8eaf0; font-size: 10px; font-weight: 700; color: #3a3a5c;
+  text-transform: uppercase; letter-spacing: 0.07em; padding: 10px 12px;
+  border-bottom: 2px solid #c8cad4; white-space: nowrap; text-align: center;
+}
+th.left { text-align: left; }
+td {
+  padding: 9px 12px; border-bottom: 1px solid #e0e2e8;
+  font-size: 12px; color: var(--text); vertical-align: middle; text-align: center;
+}
+td.left { text-align: left; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #f0f4ff !important; }
+td.num { text-align: center; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 600; }
+td.num-neutral { text-align: center; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); }
+td.neg { color: var(--coral) !important; }
+td.pos { color: var(--green) !important; }
+td.avg-col { text-align: center; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; color: var(--accent); }
+
+/* FAMILY GROUP HEADER */
+.family-header td {
+  background: #1e3a6e !important; font-size: 11px; font-weight: 700; color: #ffffff;
+  text-transform: uppercase; letter-spacing: 0.12em; padding: 9px 14px;
+  border-top: 14px solid var(--bg); border-bottom: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+.family-header:first-child td { border-top: none; }
+.family-header:hover td { background: #1e3a6e !important; }
+
+/* FAMILY SUB-HEADER */
+.family-subheader td {
+  background: #f0f1f6 !important; font-size: 9px; font-weight: 700; color: var(--text3);
+  text-transform: uppercase; letter-spacing: 0.07em; padding: 5px 12px;
+  border-bottom: 1px solid #dde0e8; white-space: nowrap; vertical-align: bottom;
+  text-align: center;
+}
+.family-subheader td.left { text-align: left; }
+.family-subheader:hover td { background: #f0f1f6 !important; }
+
+/* BADGES */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.badge-D { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+.badge-P { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+.badge-E { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
+.badge-O { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.empty-state { text-align: center; color: var(--text3); padding: 40px; font-size: 13px; }
+
+/* VS / COMPARACIÓN */
+.vs-col { text-align: center; font-family: 'DM Mono', monospace; font-size: 11px; white-space: nowrap; }
+.vs-up { color: var(--green); font-weight: 700; }
+.vs-down { color: var(--coral); font-weight: 700; }
+.vs-neutral { color: var(--text3); font-weight: 500; }
+.vs-na { color: var(--text3); font-size: 10px; font-style: italic; }
+.vs-bruto { font-size: 10px; font-weight: 400; opacity: 0.8; display: block; margin-top: 1px; }
+
+/* SOURCE PILL */
+.source-pill { font-size: 11px; padding: 3px 10px; border-radius: 20px; font-family: 'DM Mono', monospace; }
+.source-pill.auto  { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+.source-pill.manual { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg4); }
+::-webkit-scrollbar-thumb { background: #9a9ab8; border-radius: 3px; }
+
+/* EXPAND TOGGLE */
+.expand-btn { background: none; border: none; cursor: pointer; font-size: 10px; color: var(--text3); padding: 2px 4px; margin-right: 4px; transition: transform 0.18s; line-height: 1; vertical-align: middle; -webkit-tap-highlight-color: transparent; }
+.expand-btn.open { transform: rotate(90deg); }
+
+/* SECTOR ROWS */
+.sector-row td { background: #f6f7fa !important; padding: 0; border-bottom: none; }
+.sector-row:last-of-type td { border-bottom: 1px solid #e0e2e8; }
+.sector-inner { padding: 8px 16px 8px 48px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sector-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg2); border: 1px solid var(--border2); border-radius: 6px; padding: 4px 10px; font-size: 11px; font-family: 'DM Mono', monospace; white-space: nowrap; }
+.sector-chip .sc-label { font-family: 'DM Sans', sans-serif; font-size: 11px; color: var(--text2); font-weight: 500; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.sector-chip .sc-val { font-weight: 700; }
+.sc-above { color: var(--green); }
+.sc-below { color: var(--coral); }
+.sc-equal { color: var(--text3); }
+
+/* IM TAB — Inserciones por Medio */
+.im-two-col {
+  display: grid;
+  grid-template-columns: 49% 49%;
+  gap: 0 2%;
+  align-items: start;
+}
+.im-col-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.09em; color: var(--text3);
+  padding: 10px 16px 8px;
+  background: #e8eaf0;
+  border-bottom: 2px solid #c8cad4;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  display: flex; align-items: center; gap: 8px;
+}
+.im-col-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+.im-wrap {
+  display: flex; flex-direction: column; gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+/* Medio row */
+.im-medio-row {
+  display: grid;
+  grid-template-columns: 1fr 70px 70px 60px 20px 95px 95px 65px;
+  align-items: center;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+  cursor: pointer;
+  transition: background 0.13s;
+  gap: 4px;
+}
+.im-medio-row:hover { background: #f0f4ff; }
+.im-medio-row.open  { background: #eef2ff; }
+
+.im-medio-name {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 600; font-size: 13px; color: var(--text);
+}
+.im-toggle { font-size: 10px; color: var(--text3); transition: transform 0.18s; flex-shrink: 0; }
+.im-toggle.open { transform: rotate(90deg); color: var(--accent); }
+
+.im-num { text-align: center; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 600; color: var(--text2); }
+.im-num.main { color: var(--accent); font-size: 13px; font-weight: 700; text-align: center; }
+.im-pct { text-align: center; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; display: block; }
+.im-pct.up   { color: var(--green); }
+.im-pct.down { color: var(--coral); }
+.im-pct.neutral { color: var(--text3); font-style: italic; font-size: 11px; }
+
+/* Column headers */
+.im-header-row {
+  display: grid;
+  grid-template-columns: 1fr 70px 70px 60px 20px 95px 95px 65px;
+  padding: 7px 14px;
+  background: #f0f1f6;
+  font-size: 9px; font-weight: 700; color: var(--text3);
+  text-transform: uppercase; letter-spacing: 0.07em;
+  border-bottom: 1px solid #dde0e8;
+  gap: 4px;
+}
+.im-header-row span { text-align: center; }
+.im-header-row span:first-child { text-align: left; }
+
+/* Family level */
+.im-fam-block { border-bottom: 1px solid var(--border); }
+.im-fam-block:last-child { border-bottom: none; }
+.im-fam-row {
+  display: grid;
+  grid-template-columns: 1fr 70px 70px 60px 20px 95px 95px 65px;
+  align-items: center;
+  padding: 8px 14px 8px 30px;
+  background: #f6f7fa;
+  cursor: pointer;
+  border-bottom: 1px solid #eaecf2;
+  gap: 4px;
+  transition: background 0.12s;
+}
+.im-fam-row:hover { background: #eef0f8; }
+.im-fam-row.open  { background: #e8edf8; }
+.im-fam-name {
+  display: flex; align-items: center; gap: 7px;
+  font-weight: 600; font-size: 12px; color: var(--text2);
+}
+.im-fam-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+/* Product level */
+.im-prod-row {
+  display: grid;
+  grid-template-columns: 1fr 70px 70px 60px 20px 95px 95px 65px;
+  align-items: center;
+  padding: 6px 14px 6px 48px;
+  background: #fafbfd;
+  border-bottom: 1px solid #eef0f5;
+  gap: 4px;
+}
+.im-prod-row:last-child { border-bottom: none; }
+.im-prod-name { font-size: 11px; color: var(--text2); display: flex; align-items: center; gap: 6px; }
+.im-prod-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text3); flex-shrink: 0; }
+.im-prod-num { text-align: center; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text2); }
+.im-prod-pct { text-align: center; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 600; }
+.im-prod-pct.up   { color: var(--green); }
+.im-prod-pct.down { color: var(--coral); }
+.im-prod-pct.neutral { color: var(--text3); font-style: italic; }
+
+/* IM hidden containers */
+.im-fam-block > .im-fam-children { display: none; }
+.im-fam-block > .im-fam-children.open { display: block; }
+.im-medio-block > .im-medio-children { display: none; }
+.im-medio-block > .im-medio-children.open { display: block; }
+.ps-prod-block > .im-fam-children { display: none; }
+.ps-prod-block > .im-fam-children.open { display: block; }
+/* PS family rows: distinct background */
+#ps-container .im-fam-row {
+  background: #e2e7f3;
+  border-left: 3px solid #7c9ed9;
+  padding-left: 14px;
+}
+#ps-container .im-fam-row:hover { background: #d6ddf0; }
+#ps-container .im-fam-row .im-fam-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2a3a6a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tooltip-wrap { position: relative; display: inline-block; }
+.tt-trigger {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%; background: var(--bg4);
+  border: 1px solid var(--border2); font-size: 10px; color: var(--text3);
+  cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+  font-style: normal; line-height: 1; vertical-align: middle; margin-left: 4px; flex-shrink: 0;
+}
+.tt-trigger:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tooltip-box {
+  display: none; position: fixed; background: #1a1a2e; color: #e8e8f0;
+  border-radius: 10px; padding: 14px 16px; min-width: 760px; max-width: 900px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35); z-index: 9999; font-size: 12px; pointer-events: none;
+}
+.tt-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 16px; }
+.tooltip-box.tt-visible { display: block; }
+.tooltip-box::after { content: ''; position: absolute; border: 6px solid transparent; }
+.tooltip-box.tt-above::after { top: 100%; left: 50%; transform: translateX(-50%); border-top-color: #1a1a2e; }
+.tooltip-box.tt-below::after { bottom: 100%; left: 50%; transform: translateX(-50%); border-bottom-color: #1a1a2e; }
+.tt-title { font-size: 11px; font-weight: 700; color: #7dd3fc; text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 8px; padding-bottom: 7px; border-bottom: 1.5px solid rgba(125,211,252,0.35); display: flex; align-items: center; gap: 6px; }
+.tt-title::before { content: ''; display: inline-block; width: 3px; height: 13px; background: #7dd3fc; border-radius: 2px; flex-shrink: 0; }
+.tt-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 3px 0; font-size: 11px; }
+.tt-row .tt-area { color: #b8b8d0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt-row .tt-val { font-family: 'DM Mono', monospace; font-weight: 700; }
+.tt-above { color: #4ade80; }
+.tt-below { color: #f87171; }
+.tt-equal { color: #9999bb; }
+.tt-avg-line { margin-top: 8px; padding-top: 7px; border-top: 1.5px solid rgba(125,211,252,0.35); font-size: 10px; color: #7dd3fc; font-weight: 600; letter-spacing: 0.04em; display: flex; justify-content: space-between; }
+.tt-avg-line span { font-family: 'DM Mono', monospace; color: #aaaacc; font-weight: 600; }
+
+.im-separator {
+  width: 1px;
+  background: #d0d0d0;
+  height: 100%;
+  min-height: 20px;
+  justify-self: center;
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-brand"><span class="dot"></span>Análisis de Medios</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span id="source-indicator" style="display:none"></span>
+    <div id="top-badge" class="data-badge" style="display:none">— registros</div>
+  </div>
+</div>
+
+<!-- UPLOAD / LOADING -->
+<div class="upload-wrap" id="upload-wrap">
+  <div class="loading-state" id="auto-loading">
+    <div class="spinner"></div>
+    <div class="loading-text">Buscando archivo en el servidor…</div>
+  </div>
+  <div class="upload-zone" id="upload-zone" style="display:none"
+    onclick="document.getElementById('file-input').click()"
+    ondragover="event.preventDefault();this.classList.add('drag')"
+    ondragleave="this.classList.remove('drag')"
+    ondrop="onDrop(event)">
+    <div class="up-icon">📊</div>
+    <div class="up-title">Cargar Excel</div>
+    <div class="up-sub">Arrastra tu <span class="mono" style="color:var(--text2)">PRINT Y DIGITAL.xlsx</span><br>o haz clic para buscarlo</div>
+    <button class="up-btn" onclick="event.stopPropagation();document.getElementById('file-input').click()">Elegir archivo</button>
+    <div style="font-size:11px;color:var(--text3);margin-top:4px" id="upload-msg"></div>
+  </div>
+</div>
+<input type="file" id="file-input" accept=".xlsx,.xls" style="display:none" onchange="onFileInput(this)">
+
+<!-- CONTROLS -->
+<div id="controls">
+  <!-- TABS -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-pm" onclick="switchTab('pm')">📊 Presupuestos Medios</button>
+    <button class="tab-btn" id="tab-pd" onclick="switchTab('pd')">📈 Productos Desglosados</button>
+    <button class="tab-btn" id="tab-ps" onclick="switchTab('ps')">🎯 Productos Seleccionados</button>
+    <button class="tab-btn" id="tab-im" onclick="switchTab('im')">🗞️ Inserciones por Medio</button>
+  </div>
+
+  <div id="filters-sticky">
+  <div class="filter-block">
+    <div class="filter-block-title">Filtros principales</div>
+    <div class="filters-row">
+      <div class="filter-group">
+        <label>Año</label>
+        <select id="f-year" onchange="renderTable()"><option value="all">Todos</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Canal</label>
+        <select id="f-canal" onchange="renderTable()">
+          <option value="all">Todos</option>
+          <option value="DIGITAL">DIGITAL</option>
+          <option value="PRINT">PRINT</option>
+          <option value="EVENTOS">EVENTOS</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Buscar producto</label>
+        <input type="text" id="f-search" oninput="renderTable()" placeholder="Escribe para filtrar...">
+      </div>
+      <div class="filter-group">
+        <label>Ordenar por</label>
+        <select id="f-sort" onchange="renderTable()">
+          <option value="familia">Familia</option>
+          <option value="lineas">Nº líneas ↓</option>
+          <option value="neto">Ingreso neto ↓</option>
+          <option value="avg">Valor principal ↓</option>
+          <option value="nombre">Nombre A-Z</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Modo ceros</label>
+        <div class="zero-toggle-wrap">
+          <button class="zero-btn active" id="btn-con-ceros" onclick="setZeroMode('con')">Con líneas a 0 €</button>
+          <button class="zero-btn" id="btn-sin-ceros" onclick="setZeroMode('sin')">Sin líneas a 0 €</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-block" style="border-bottom: 2px solid var(--border);">
+    <div class="filter-block-title">Meses</div>
+    <div class="months-row" id="months-row"></div>
+  </div>
+  </div>
+
+  <div class="main">
+    <div class="summary-bar" id="summary-bar"></div>
+    <div class="info-note hidden" id="info-note">
+      <span class="info-icon">💡</span>
+      <span id="info-text"></span>
+    </div>
+    <div class="table-wrap" id="table-wrap">
+      <div class="table-scroll">
+        <table>
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="table-wrap" id="im-container" style="display:none;overflow:hidden;"></div>
+    <div class="table-wrap" id="ps-container" style="display:none;overflow:hidden;"></div>
+  </div>
+</div>
+
+<script>
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const COL_MES    = 'Mes inserción';
+const COL_PUB    = 'Publicación';
+const COL_FAM    = 'Familia';
+const COL_PROD   = 'Producto';
+const COL_YEAR   = 'Año inserción';
+const COL_ING    = 'Imp.Neto a Comisionar';
+const COL_AREA   = 'ÁREAS';
+const COL_SECTOR = 'Sector';
+const COL_ANUNC  = 'Anunciante';
+const COL_MARCA  = 'Marca';
+const SHEET_NAME = 'Analizador general';
+
+const AUTO_LOAD_PATHS = ['PRINT Y DIGITAL.xlsx','datos.xlsx','data.xlsx'];
+const MESES_ORDER = ['01 Enero','02 Febrero','03 Marzo','04 Abril','05 Mayo','06 Junio','07 Julio','08 Agosto','09 Septiembre','10 Octubre','11 Noviembre','12 Diciembre'];
+const MESES_SHORT = {'01 Enero':'Ene','02 Febrero':'Feb','03 Marzo':'Mar','04 Abril':'Abr','05 Mayo':'May','06 Junio':'Jun','07 Julio':'Jul','08 Agosto':'Ago','09 Septiembre':'Sep','10 Octubre':'Oct','11 Noviembre':'Nov','12 Diciembre':'Dic'};
+const FAM_DIGITAL = new Set(['Curated','Display','Programatica Display Directo','Programatica Display Indirecto','Social Networks','Sponsorship','Video','Video Programatico Directo','Video Programatico Indirecto']);
+const FAM_PRINT   = new Set(['CERTIFICACIÓN','CONVENCIONAL','Curated','ELEMENTOS ESPECIALES','Otras facturaciones','Patrocinio','Sponsorship']);
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let DATA = [];
+let selectedMonths = new Set();
+let zeroMode = 'con';
+let activeTab = 'pm'; // 'pm' = Precios Medios, 'pd' = Productos Desglosados
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('tab-pm').classList.toggle('active', tab === 'pm');
+  document.getElementById('tab-pd').classList.toggle('active', tab === 'pd');
+  document.getElementById('tab-im').classList.toggle('active', tab === 'im');
+  document.getElementById('tab-ps').classList.toggle('active', tab === 'ps');
+  renderTable();
+}
+
+// ─── AUTO-LOAD ────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => { tryAutoLoad(AUTO_LOAD_PATHS.slice()); });
+
+async function tryAutoLoad(paths) {
+  if (paths.length === 0) { showManualUpload('Archivo no encontrado en el servidor.'); return; }
+  const path = paths.shift();
+  try {
+    const res = await fetch(path);
+    if (!res.ok) throw new Error('not ok');
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('text/html')) throw new Error('html response');
+    const buffer = await res.arrayBuffer();
+    processArrayBuffer(buffer, path, 'auto');
+  } catch (_) { tryAutoLoad(paths); }
+}
+
+function showManualUpload(msg) {
+  document.getElementById('auto-loading').style.display = 'none';
+  document.getElementById('upload-zone').style.display  = '';
+  if (msg) document.getElementById('upload-msg').textContent = msg;
+}
+
+// ─── CLASSIFY ─────────────────────────────────────────────────────────────────
+function classifyRow(row) {
+  const fam  = (row[COL_FAM]  || '').trim();
+  const prod = (row[COL_PROD] || '').trim();
+  if (fam === 'Eventos') return 'EVENTOS';
+  if (fam === 'Curated') {
+    if (prod === 'CURATED') return 'PRINT';
+    if (prod === 'Curated') return 'DIGITAL';
+    return FAM_DIGITAL.has(fam) ? 'DIGITAL' : 'PRINT';
+  }
+  if (fam === 'Sponsorship') {
+    if (prod === 'DOBLE PAGINA BRANDED' || prod === 'PAGINA BRANDED') return 'PRINT';
+    return 'DIGITAL';
+  }
+  if (FAM_DIGITAL.has(fam)) return 'DIGITAL';
+  if (FAM_PRINT.has(fam))   return 'PRINT';
+  return 'OTROS';
+}
+
+// ─── FORMAT ───────────────────────────────────────────────────────────────────
+function fmt(n) { return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0, useGrouping: true }).format(n) + ' €'; }
+function fmtNum(n) { return new Intl.NumberFormat('es-ES', { useGrouping: true }).format(n); }
+
+// ─── FILE HANDLERS ────────────────────────────────────────────────────────────
+function onDrop(e) { e.preventDefault(); document.getElementById('upload-zone').classList.remove('drag'); const f = e.dataTransfer.files[0]; if (f) processFile(f); }
+function onFileInput(input) { const f = input.files[0]; if (f) processFile(f); }
+function processFile(file) {
+  document.getElementById('upload-msg').textContent = `Leyendo ${file.name}…`;
+  const reader = new FileReader();
+  reader.onload = e => processArrayBuffer(e.target.result, file.name, 'manual');
+  reader.readAsArrayBuffer(file);
+}
+
+// ─── NETEO ────────────────────────────────────────────────────────────────────
+// Elimina pares de líneas que se cancelan exactamente:
+// misma pub + anunciante + marca + producto + año, e importe igual en valor
+// absoluto pero signo opuesto. Se eliminan las DOS líneas.
+function applyNeteo(rows) {
+  // Bucket por clave de agrupación
+  const buckets = new Map();
+  rows.forEach((r, i) => {
+    const key = [r._pub, r._anunc, r._marca, r._prod, r._year].join('|||');
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(i);
+  });
+
+  const toRemove = new Set();
+
+  buckets.forEach(indices => {
+    // Separar positivos y negativos dentro del grupo
+    const pos = indices.filter(i => rows[i]._ingreso > 0);
+    const neg = indices.filter(i => rows[i]._ingreso < 0);
+
+    // Para cada negativo, buscar un positivo con el mismo valor absoluto
+    const usedPos = new Set();
+    neg.forEach(ni => {
+      const absNeg = Math.abs(rows[ni]._ingreso);
+      const match = pos.find(pi => !usedPos.has(pi) && Math.abs(rows[pi]._ingreso - absNeg) < 0.01);
+      if (match !== undefined) {
+        toRemove.add(ni);
+        toRemove.add(match);
+        usedPos.add(match);
+      }
+    });
+  });
+
+  return rows.filter((_, i) => !toRemove.has(i));
+}
+
+function processArrayBuffer(buffer, fileName, source) {
+  try {
+    const wb = XLSX.read(buffer, { type: 'array' });
+    const sheetName = wb.SheetNames.includes(SHEET_NAME) ? SHEET_NAME : wb.SheetNames[0];
+    const raw = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' });
+    DATA = raw.map(row => ({
+      ...row,
+      _canal:   classifyRow(row),
+      _ingreso: parseFloat(row[COL_ING]) || 0,
+      _prod:    (row[COL_PROD] || '(sin producto)').trim(),
+      _fam:     (row[COL_FAM]  || '').trim(),
+      _year:    String(row[COL_YEAR] || '').trim(),
+      _mes:     String(row[COL_MES]  || '').trim(),
+      _area:    (row[COL_AREA]   || '').trim(),
+      _sector:  (row[COL_SECTOR] || '').trim(),
+      _pub:     (row[COL_PUB]   || '').trim(),
+      _anunc:   (row[COL_ANUNC] || '').trim(),
+      _marca:   (row[COL_MARCA] || '').trim(),
+    }));
+
+    // ── Neteo: eliminar pares que se cancelan exactamente ──
+    // Dos líneas con misma pub+anunc+marca+prod+año e importe igual en valor absoluto
+    // pero signo opuesto se eliminan las dos.
+    const beforeNeteo = DATA.length;
+    DATA = applyNeteo(DATA);
+    const neteadas = beforeNeteo - DATA.length;
+
+    document.getElementById('top-badge').style.display = '';
+    document.getElementById('top-badge').textContent = DATA.length.toLocaleString('es-ES') + ' registros · ' + fileName + (neteadas > 0 ? ` · ${neteadas} líneas neteadas` : '');
+    const ind = document.getElementById('source-indicator');
+    ind.style.display = '';
+    ind.innerHTML = source === 'auto'
+      ? '<span class="source-pill auto">⚡ Auto</span>'
+      : '<span class="source-pill manual">📂 Manual</span>';
+
+    populateFilters();
+    document.getElementById('upload-wrap').style.display = 'none';
+    document.getElementById('controls').style.display    = 'block';
+    renderTable();
+  } catch(err) {
+    if (source === 'auto') showManualUpload('Error al leer el archivo. Carga uno manualmente.');
+    else document.getElementById('upload-msg').textContent = 'Error: ' + err.message;
+  }
+}
+
+// ─── POPULATE ─────────────────────────────────────────────────────────────────
+function populateFilters() {
+  const years = [...new Set(DATA.map(r => r._year).filter(Boolean))].sort();
+  const yrSel = document.getElementById('f-year');
+  yrSel.innerHTML = '<option value="all">Todos</option>';
+  years.forEach(y => { const o = document.createElement('option'); o.value = y; o.textContent = y; yrSel.appendChild(o); });
+  buildMonthChips();
+}
+
+function buildMonthChips() {
+  const availableMeses = new Set(DATA.map(r => r._mes).filter(Boolean));
+  const meses = MESES_ORDER.filter(m => availableMeses.has(m));
+  const container = document.getElementById('months-row');
+  const allActive = selectedMonths.size === 0;
+  let html = `<span class="month-chip chip-all ${allActive ? 'active' : ''}" onclick="toggleMonth('all')">Todos</span>`;
+  meses.forEach(m => {
+    const active = selectedMonths.has(m);
+    const short  = MESES_SHORT[m] || m;
+    html += `<span class="month-chip ${active ? 'active' : ''}" data-mes="${m}" onclick="toggleMonth('${m}')">${short}</span>`;
+  });
+  container.innerHTML = html;
+}
+
+// ─── INTERACTIONS ─────────────────────────────────────────────────────────────
+function toggleMonth(mes) {
+  if (mes === 'all') selectedMonths.clear();
+  else { if (selectedMonths.has(mes)) selectedMonths.delete(mes); else selectedMonths.add(mes); }
+  buildMonthChips();
+  renderTable();
+}
+
+function setZeroMode(mode) {
+  zeroMode = mode;
+  document.getElementById('btn-con-ceros').classList.toggle('active', mode === 'con');
+  document.getElementById('btn-sin-ceros').classList.toggle('active', mode === 'sin');
+  renderTable();
+  // También actualizar Inserciones por Medio si está visible
+  if (document.getElementById('im-container').style.display !== 'none') {
+    renderIM();
+  }
+}
+
+// ─── FILTER ───────────────────────────────────────────────────────────────────
+function getFiltered() {
+  const yr    = document.getElementById('f-year').value;
+  const canal = document.getElementById('f-canal').value;
+  return DATA.filter(r => {
+    if (yr    !== 'all' && r._year  !== yr)    return false;
+    if (canal !== 'all' && r._canal !== canal) return false;
+    if (selectedMonths.size > 0 && !selectedMonths.has(r._mes)) return false;
+    return true;
+  });
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function renderTable() {
+  if (activeTab === 'im') { renderIM(); return; }
+  if (activeTab === 'ps') { renderPS(); return; }
+  // Standard tabs: ensure table visible, IM container hidden
+  document.getElementById('table-wrap').style.display = '';
+  document.getElementById('im-container').style.display = 'none';
+  document.getElementById('ps-container').style.display = 'none';
+  const rows   = getFiltered();
+  const search = document.getElementById('f-search').value.toLowerCase().trim();
+  const sortBy = document.getElementById('f-sort').value;
+  const yr     = document.getElementById('f-year').value;
+  const isPM   = activeTab === 'pm';
+
+  // ── Agregados año actual ──
+  const map = new Map();
+  rows.forEach(r => {
+    const key = r._prod + '|||' + r._canal;
+    if (!map.has(key)) map.set(key, {
+      prod: r._prod, canal: r._canal, fam: r._fam,
+      lineas: 0, pos: 0, neg: 0, cero: 0,
+      sumaPos: 0, sumaNeg: 0,
+      areaMap: new Map(), sectorMap: new Map(), pubMap: new Map(),
+    });
+    const g = map.get(key);
+    g.lineas++;
+    if (r._ingreso > 0)      { g.pos++;  g.sumaPos += r._ingreso; }
+    else if (r._ingreso < 0) { g.neg++;  g.sumaNeg += r._ingreso; }
+    else                     { g.cero++; }
+    const areaKey = r._area || '(sin área)';
+    if (!g.areaMap.has(areaKey)) g.areaMap.set(areaKey, { lineas: 0, cero: 0, neg: 0, sumaPos: 0, sumaNeg: 0 });
+    const ag = g.areaMap.get(areaKey);
+    ag.lineas++; if (r._ingreso > 0) ag.sumaPos += r._ingreso; else if (r._ingreso < 0) { ag.sumaNeg += r._ingreso; ag.neg++; } else ag.cero++;
+    const sectorKey = r._sector || '(sin sector)';
+    if (!g.sectorMap.has(sectorKey)) g.sectorMap.set(sectorKey, { lineas: 0, cero: 0, neg: 0, sumaPos: 0, sumaNeg: 0 });
+    const sg = g.sectorMap.get(sectorKey);
+    sg.lineas++; if (r._ingreso > 0) sg.sumaPos += r._ingreso; else if (r._ingreso < 0) { sg.sumaNeg += r._ingreso; sg.neg++; } else sg.cero++;
+    const pubKey = r._pub || '(sin publicación)';
+    if (!g.pubMap.has(pubKey)) g.pubMap.set(pubKey, { lineas: 0, cero: 0, neg: 0, sumaPos: 0, sumaNeg: 0 });
+    const pg = g.pubMap.get(pubKey);
+    pg.lineas++; if (r._ingreso > 0) pg.sumaPos += r._ingreso; else if (r._ingreso < 0) { pg.sumaNeg += r._ingreso; pg.neg++; } else pg.cero++;
+  });
+
+  // ── Agregados año anterior ──
+  const prevMap = new Map();
+  if (yr !== 'all') {
+    const prevYr = String(parseInt(yr, 10) - 1);
+    const canal  = document.getElementById('f-canal').value;
+    DATA.filter(r => {
+      if (r._year !== prevYr) return false;
+      if (canal !== 'all' && r._canal !== canal) return false;
+      if (selectedMonths.size > 0 && !selectedMonths.has(r._mes)) return false;
+      return true;
+    }).forEach(r => {
+      const key = r._prod + '|||' + r._canal;
+      if (!prevMap.has(key)) prevMap.set(key, { lineas: 0, cero: 0, neg: 0, sumaPos: 0, sumaNeg: 0 });
+      const g = prevMap.get(key);
+      g.lineas++;
+      if (r._ingreso > 0)      g.sumaPos += r._ingreso;
+      else if (r._ingreso < 0) { g.sumaNeg += r._ingreso; g.neg++; }
+      else                     g.cero++;
+    });
+  }
+
+  let items = [...map.values()].map(g => {
+    const neto = g.sumaPos + g.sumaNeg;
+    // Con ceros: ingreso positivo / todas las líneas (incluidas las de 0€) → precio medio real incluyendo lo regalado
+    const avgCon = g.lineas > 0 ? g.sumaPos / g.lineas : 0;
+    // Sin ceros: ingreso positivo / solo líneas positivas → precio real de venta
+    const avgSin = g.pos > 0 ? g.sumaPos / g.pos : 0;
+
+    let prevVal = null, lineasPrev = null;
+    if (yr !== 'all') {
+      const key = g.prod + '|||' + g.canal;
+      const p = prevMap.get(key);
+      if (p) {
+        lineasPrev = p.lineas;
+        const pPos = p.lineas - (p.cero || 0) - (p.neg || 0);
+        if (isPM) {
+          // Precio medio año anterior: mismo criterio que año actual según zeroMode
+          const pPos   = p.lineas - (p.cero || 0) - (p.neg || 0);
+          const pLineasAll = p.lineas;
+          prevVal = zeroMode === 'con'
+            ? (pLineasAll > 0 ? p.sumaPos / pLineasAll : 0)
+            : (pPos       > 0 ? p.sumaPos / pPos       : 0);
+        } else {
+          // Ingreso bruto año anterior
+          prevVal = p.sumaPos + p.sumaNeg;
+        }
+      }
+    }
+
+    const makeAvgs = (mapData, nameKey) => {
+      const out = [];
+      mapData.forEach((d, name) => {
+        const lineasPos   = d.lineas - (d.cero || 0) - (d.neg || 0);
+        // Con ceros: dividir entre todas las líneas; Sin ceros: solo positivas
+        const avg = zeroMode === 'con'
+          ? (d.lineas > 0 ? d.sumaPos / d.lineas : 0)
+          : (lineasPos  > 0 ? d.sumaPos / lineasPos  : 0);
+        out.push({ area: name, avg });
+      });
+      out.sort((a, b) => b.avg - a.avg);
+      return out;
+    };
+
+    return {
+      ...g, neto, avgCon, avgSin, prevVal, lineasPrev,
+      areas:   makeAvgs(g.areaMap),
+      sectors: makeAvgs(g.sectorMap),
+      pubs:    makeAvgs(g.pubMap),
+    };
+  });
+
+  if (search) items = items.filter(g => g.prod.toLowerCase().includes(search));
+
+  const mainVal = g => isPM ? (zeroMode === 'con' ? g.avgCon : g.avgSin) : g.neto;
+  if (sortBy === 'familia') {
+    items.sort((a, b) => { const fa = a.fam||'', fb = b.fam||''; return fa !== fb ? fa.localeCompare(fb) : mainVal(b) - mainVal(a); });
+  } else if (sortBy === 'lineas') { items.sort((a, b) => b.lineas - a.lineas);
+  } else if (sortBy === 'neto')   { items.sort((a, b) => b.neto - a.neto);
+  } else if (sortBy === 'avg')    { items.sort((a, b) => mainVal(b) - mainVal(a));
+  } else                          { items.sort((a, b) => a.prod.localeCompare(b.prod)); }
+
+  // ── Summary ──
+  const totalLineas = items.reduce((s, g) => s + g.lineas, 0);
+  const totalNeto   = items.reduce((s, g) => s + g.neto, 0);
+  const totalCeros  = items.reduce((s, g) => s + g.cero, 0);
+  document.getElementById('summary-bar').innerHTML = `
+    <div class="summary-card accent"><div class="s-val">${items.length}</div><div class="s-label">productos distintos</div></div>
+    <div class="summary-card purple"><div class="s-val">${fmtNum(totalLineas)}</div><div class="s-label">líneas totales</div></div>
+    <div class="summary-card green"><div class="s-val">${fmt(totalNeto)}</div><div class="s-label">ingreso neto total</div></div>
+    <div class="summary-card amber"><div class="s-val">${fmtNum(totalCeros)}</div><div class="s-label">líneas a 0 €</div></div>`;
+
+  // ── Info note ──
+  const note = document.getElementById('info-note');
+  note.classList.remove('hidden');
+  if (isPM) {
+    document.getElementById('info-text').innerHTML = zeroMode === 'sin'
+      ? '<strong>Precios Medios · Sin líneas a 0 €.</strong> Precio real de venta: ingreso neto ÷ líneas con valor positivo. Te dice a qué precio estás vendiendo.'
+      : '<strong>Precios Medios · Con líneas a 0 €.</strong> Precio medio incluyendo regalos: ingreso neto ÷ todas las líneas (incluyendo las de 0 €). Te dice el precio real por servicio prestado, monetizado o no.';
+  } else {
+    document.getElementById('info-text').innerHTML = zeroMode === 'sin'
+      ? '<strong>Productos Desglosados · Sin líneas a 0 €.</strong> Muestra el ingreso neto total por producto y su comparativa con el año anterior.'
+      : '<strong>Productos Desglosados · Con líneas a 0 €.</strong> Muestra el ingreso neto total por producto y su comparativa con el año anterior.';
+  }
+
+  // ── Columnas ──
+  const showCeroCol = zeroMode === 'sin';
+  const showVsCol   = yr !== 'all';
+  const prevYrLabel = yr !== 'all' ? String(parseInt(yr, 10) - 1) : '';
+
+  // Columnas base: Producto, Canal, Familia, Líneas totales, [Líneas prevYear], Pos, Neg, [0€], SumaPos, SumaNeg, ColPrincipal, [ColAnterior]
+  const totalCols = 9 + (showCeroCol ? 1 : 0) + (showVsCol ? 2 : 0);
+
+  const colPrincipalTh = isPM
+    ? `<th class="num" style="color:var(--accent)">Precio medio${zeroMode === 'sin' ? '<br><span style="font-size:9px;font-weight:400">precio real venta</span>' : '<br><span style="font-size:9px;font-weight:400">incl. regalados (0€)</span>'}</th>`
+    : `<th class="num" style="color:var(--accent)">Ingreso<br><span style="font-size:9px;font-weight:400">año actual</span></th>`;
+  const colAnteriorTh = showVsCol
+    ? (isPM
+        ? `<th class="num" style="color:var(--text2)">vs ${prevYrLabel}<br><span style="font-size:9px;font-weight:400">variación</span></th>`
+        : `<th class="num" style="color:var(--text2)">Ingreso<br><span style="font-size:9px;font-weight:400">${prevYrLabel}</span></th>`)
+    : '';
+
+  document.getElementById('thead').innerHTML = `<tr>
+    <th class="left">Producto</th><th>Canal</th><th>Familia</th>
+    <th class="num">Líneas<br>totales</th>
+    ${showVsCol ? `<th class="num" style="color:var(--text3)">Líneas<br>${prevYrLabel}</th>` : ''}
+    <th class="num" style="color:var(--green)">Líneas<br>positivas</th>
+    <th class="num" style="color:var(--coral)">Líneas<br>negativas</th>
+    ${showCeroCol ? '<th class="num" style="color:var(--amber)">Líneas<br>a 0 €</th>' : ''}
+    <th class="num">Suma<br>bruta (+)</th>
+    <th class="num">Suma<br>negativa</th>
+    ${colPrincipalTh}
+    ${colAnteriorTh}
+  </tr>`;
+
+  const tbody = document.getElementById('tbody');
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="${totalCols}" class="empty-state">Sin datos para los filtros seleccionados</td></tr>`;
+    return;
+  }
+
+  const canalClass = { DIGITAL:'badge-D', PRINT:'badge-P', EVENTOS:'badge-E', OTROS:'badge-O' };
+  let html = '';
+  let currentFam = null;
+  const byFamilia = sortBy === 'familia';
+
+  // Sub-header HTML helper
+  const subHeaderHtml = () => {
+    const cpSh = isPM
+      ? `<td class="left" style="color:var(--accent)">Precio medio${zeroMode==='sin'?'<br><span style="font-size:8px">(sin 0€)</span>':'<br><span style="font-size:8px">(con 0€)</span>'}</td>`
+      : `<td class="left" style="color:var(--accent)">Ingreso<br><span style="font-size:8px">año actual</span></td>`;
+    const caSh = showVsCol
+      ? (isPM
+          ? `<td class="left" style="color:var(--text2)">vs ${prevYrLabel}<br><span style="font-size:8px">variación</span></td>`
+          : `<td class="left" style="color:var(--text2)">Ingreso<br><span style="font-size:8px">${prevYrLabel}</span></td>`)
+      : '';
+    return `<tr class="family-subheader">
+      <td class="left">Producto</td><td>Canal</td><td>Familia</td>
+      <td>Líneas<br>totales</td>
+      ${showVsCol ? `<td style="color:var(--text3)">Líneas<br>${prevYrLabel}</td>` : ''}
+      <td style="color:var(--green)">Líneas<br>positivas</td>
+      <td style="color:var(--coral)">Líneas<br>negativas</td>
+      ${showCeroCol ? '<td style="color:var(--amber)">Líneas<br>a 0 €</td>' : ''}
+      <td>Suma<br>bruta (+)</td>
+      <td>Suma<br>negativa</td>
+      ${cpSh}${caSh}
+    </tr>`;
+  };
+
+  items.forEach((g, idx) => {
+    if (byFamilia && g.fam !== currentFam) {
+      currentFam = g.fam;
+      html += `<tr class="family-header"><td colspan="${totalCols}">▌ ${g.fam || '(sin familia)'}</td></tr>`;
+      html += subHeaderHtml();
+    }
+
+    const curVal = isPM ? (zeroMode === 'con' ? g.avgCon : g.avgSin) : g.neto;
+    const rowId  = 'row-' + idx;
+
+    // Tooltip rows
+    const ttRowsHtml = (arr) => arr.length
+      ? arr.map(s => { const cls = s.avg > curVal ? 'tt-above' : s.avg < curVal ? 'tt-below' : 'tt-equal'; return `<div class="tt-row"><span class="tt-area">${s.area}</span><span class="tt-val ${cls}">${fmt(s.avg)}</span></div>`; }).join('')
+      : `<div class="tt-row"><span class="tt-area" style="font-style:italic">Sin datos</span></div>`;
+    const ttRefLabel = isPM ? 'Media del producto' : 'Ingreso neto producto';
+    const ttRefVal   = isPM ? fmt(curVal) : fmt(g.neto);
+
+    // Sector chips
+    const sectorChips = g.sectors.length
+      ? g.sectors.map(s => { const cls = s.avg > curVal ? 'sc-above' : s.avg < curVal ? 'sc-below' : 'sc-equal'; return `<span class="sector-chip"><span class="sc-label">${s.area}</span><span class="sc-val ${cls}">${fmt(s.avg)}</span></span>`; }).join('')
+      : `<span style="font-size:11px;color:var(--text3);font-style:italic">Sin datos de sector</span>`;
+
+    // Líneas prev cell
+    const lineasPrevCell = (() => {
+      if (!showVsCol) return '';
+      if (g.lineasPrev === null) return `<td class="num-neutral" style="font-size:10px;font-style:italic">—</td>`;
+      const diff = g.lineas - g.lineasPrev;
+      const pct  = g.lineasPrev > 0 ? (diff / g.lineasPrev) * 100 : null;
+      const sign = diff >= 0 ? '+' : '';
+      const cls  = diff > 0 ? 'color:var(--green)' : diff < 0 ? 'color:var(--coral)' : 'color:var(--text3)';
+      const pctH = pct !== null ? `<span style="font-size:10px;${cls};font-weight:700;margin-left:4px">(${sign}${pct.toFixed(0)}%)</span>` : '';
+      return `<td class="num-neutral">${fmtNum(g.lineasPrev)}${pctH}</td>`;
+    })();
+
+    // Columna principal + anterior
+    const colPrincipalTd = `<td class="avg-col">${fmt(curVal)}</td>`;
+    const colAnteriorTd = (() => {
+      if (!showVsCol) return '';
+      if (g.prevVal === null) return `<td class="vs-col"><span class="vs-na">Sin datos ${prevYrLabel}</span></td>`;
+      if (isPM) {
+        // Precio medio: mostrar % variación
+        if (g.prevVal === 0) return `<td class="vs-col"><span class="vs-na">Precio prev. 0 €</span></td>`;
+        const diff = curVal - g.prevVal;
+        const pct  = (diff / Math.abs(g.prevVal)) * 100;
+        const sign = diff >= 0 ? '+' : '';
+        const cls  = diff >= 0 ? 'vs-up' : 'vs-down';
+        const arrow = diff >= 0 ? '▲' : '▼';
+        return `<td class="vs-col"><span class="${cls}">${arrow} ${sign}${pct.toFixed(1)}%</span><span class="vs-bruto ${cls}">(${sign}${fmt(diff)})</span></td>`;
+      } else {
+        // Ingreso desglosado: mostrar ingreso anterior + % diff
+        const diff = g.neto - g.prevVal;
+        const pct  = g.prevVal !== 0 ? (diff / Math.abs(g.prevVal)) * 100 : null;
+        const sign = diff >= 0 ? '+' : '';
+        const cls  = diff >= 0 ? 'vs-up' : 'vs-down';
+        return `<td class="vs-col"><span style="font-family:'DM Mono',monospace;font-size:11px;font-weight:700">${fmt(g.prevVal)}</span><span class="${cls} vs-bruto">(${sign}${pct !== null ? pct.toFixed(1)+'%' : '—'})</span></td>`;
+      }
+    })();
+
+    html += `<tr data-rowid="${rowId}">
+      <td class="left">
+        <button class="expand-btn" id="btn-${rowId}" onclick="toggleSector('${rowId}')">▶</button>
+        <strong>${g.prod}</strong>
+        <span class="tooltip-wrap">
+          <span class="tt-trigger" id="tti-${rowId}"
+            onmouseenter="showTooltip('tti-${rowId}','tt-${rowId}')"
+            onmouseleave="hideTooltip('tt-${rowId}')"
+            onclick="toggleTooltip(event,'tti-${rowId}','tt-${rowId}')">i</span>
+          <div class="tooltip-box" id="tt-${rowId}">
+            <div class="tt-cols">
+              <div>
+                <div class="tt-title">Precio medio por área</div>
+                ${ttRowsHtml(g.areas)}
+                <div class="tt-avg-line">${ttRefLabel} <span>${ttRefVal}</span></div>
+              </div>
+              <div style="border-left:1px solid rgba(255,255,255,0.08);padding-left:16px">
+                <div class="tt-title">Precio medio por sector</div>
+                ${ttRowsHtml(g.sectors)}
+                <div class="tt-avg-line">${ttRefLabel} <span>${ttRefVal}</span></div>
+              </div>
+              <div style="border-left:1px solid rgba(255,255,255,0.08);padding-left:16px">
+                <div class="tt-title">Precio medio por publicación</div>
+                ${ttRowsHtml(g.pubs)}
+                <div class="tt-avg-line">${ttRefLabel} <span>${ttRefVal}</span></div>
+              </div>
+            </div>
+          </div>
+        </span>
+      </td>
+      <td><span class="badge ${canalClass[g.canal] || 'badge-O'}">${g.canal}</span></td>
+      <td style="font-size:11px;color:var(--text3)">${g.fam}</td>
+      <td class="num">${fmtNum(g.lineas)}</td>
+      ${lineasPrevCell}
+      <td class="num pos">${fmtNum(g.pos)}</td>
+      <td class="num ${g.neg > 0 ? 'neg' : 'num-neutral'}">${fmtNum(g.neg)}</td>
+      ${showCeroCol ? `<td class="num ${g.cero > 0 ? '' : 'num-neutral'}" style="${g.cero > 0 ? 'color:var(--amber)' : ''}">${fmtNum(g.cero)}</td>` : ''}
+      <td class="num">${fmt(g.sumaPos)}</td>
+      <td class="num ${g.sumaNeg < 0 ? 'neg' : 'num-neutral'}">${g.sumaNeg !== 0 ? fmt(g.sumaNeg) : '—'}</td>
+      ${colPrincipalTd}
+      ${colAnteriorTd}
+    </tr>
+    <tr class="sector-row" id="sector-${rowId}" style="display:none">
+      <td colspan="${totalCols}">
+        <div class="sector-inner">
+          <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);font-weight:600;margin-right:4px;white-space:nowrap">Por sector →</span>
+          ${sectorChips}
+        </div>
+      </td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+  document.addEventListener('click', closeTipsOutside, { once: false });
+}
+
+// ─── IM — INSERCIONES POR MEDIO ──────────────────────────────────────────────
+function renderIM() {
+  const yr    = document.getElementById('f-year').value;
+  const canal = document.getElementById('f-canal').value;
+
+  // Show/hide correct containers
+  document.getElementById('table-wrap').style.display = 'none';
+  document.getElementById('im-container').style.display = '';
+  document.getElementById('ps-container').style.display = 'none';
+
+  // Filter current year
+  // Productos excluidos (gastos)
+  const excludedProducts = [
+    'Article (Production Cost)',
+    'Content Ignition',
+    'COSTES FABRICACION PRODUCCION',
+    'COSTES REALIZACION',
+    'Gastos Ejecución (Production Cost)'
+  ];
+
+  const rowsY1 = DATA.filter(r => {
+    if (yr !== 'all' && r._year !== yr) return false;
+    if (canal !== 'all' && r._canal !== canal) return false;
+    if (selectedMonths.size > 0 && !selectedMonths.has(r._mes)) return false;
+    if (excludedProducts.includes(r._prod)) return false;
+    // Filtro de líneas a 0€
+    if (zeroMode === 'sin' && (parseFloat(r._ingreso) || 0) === 0) return false;
+    return true;
+  });
+
+  // Filter previous year
+  let rowsY0 = [];
+  let prevYrLabel = '';
+  if (yr !== 'all') {
+    prevYrLabel = String(parseInt(yr, 10) - 1);
+    rowsY0 = DATA.filter(r => {
+      if (r._year !== prevYrLabel) return false;
+      if (canal !== 'all' && r._canal !== canal) return false;
+      if (selectedMonths.size > 0 && !selectedMonths.has(r._mes)) return false;
+      if (excludedProducts.includes(r._prod)) return false;
+      // Filtro de líneas a 0€
+      if (zeroMode === 'sin' && (parseFloat(r._ingreso) || 0) === 0) return false;
+      return true;
+    });
+  }
+
+  // ── Classify a publication name as web or revista ──
+  // Webs: start with "www." (case-insensitive) or contain a dot after the first word
+  function isWeb(pub) {
+    const p = (pub || '').trim().toLowerCase();
+    return p.startsWith('www.');
+  }
+
+  // ── Aggregate tree: medio → familia → producto ──
+  function buildTree(rows) {
+    const tree = {};
+    rows.forEach(r => {
+      const medio = r._pub || '(sin publicación)';
+      const fam   = r._fam || '(sin familia)';
+      const prod  = r._prod || '(sin producto)';
+      const ing   = parseFloat(r._ingreso) || 0;
+      if (!tree[medio]) tree[medio] = { n: 0, ing: 0, fams: {} };
+      tree[medio].n++;
+      tree[medio].ing += ing;
+      if (!tree[medio].fams[fam]) tree[medio].fams[fam] = { n: 0, ing: 0, prods: {} };
+      tree[medio].fams[fam].n++;
+      tree[medio].fams[fam].ing += ing;
+      if (!tree[medio].fams[fam].prods[prod]) tree[medio].fams[fam].prods[prod] = { n: 0, ing: 0 };
+      tree[medio].fams[fam].prods[prod].n++;
+      tree[medio].fams[fam].prods[prod].ing += ing;
+    });
+    return tree;
+  }
+
+  const treeY1 = buildTree(rowsY1);
+  const treeY0 = buildTree(rowsY0);
+
+  const allMedios = [...new Set([...Object.keys(treeY1), ...Object.keys(treeY0)])].sort();
+  const revistas  = allMedios.filter(m => !isWeb(m));
+  const webs      = allMedios.filter(m =>  isWeb(m));
+
+  // Summary cards (all medios combined)
+  const totalLinY1 = rowsY1.length;
+  const totalLinY0 = rowsY0.length;
+  const diffTot    = totalLinY1 - totalLinY0;
+  const pctTot     = totalLinY0 > 0 ? (diffTot / totalLinY0) * 100 : null;
+
+  document.getElementById('summary-bar').innerHTML = `
+    <div class="summary-card accent"><div class="s-val">${fmtNum(revistas.length)}</div><div class="s-label">revistas</div></div>
+    <div class="summary-card" style="border-top:3px solid var(--purple)"><div class="s-val">${fmtNum(webs.length)}</div><div class="s-label">webs</div></div>
+    <div class="summary-card purple"><div class="s-val">${fmtNum(totalLinY1)}</div><div class="s-label">líneas ${yr !== 'all' ? yr : 'totales'}</div></div>
+    ${yr !== 'all' ? `<div class="summary-card ${diffTot >= 0 ? 'green' : 'amber'}">
+      <div class="s-val" style="color:${diffTot >= 0 ? 'var(--green)' : 'var(--coral)'};">${diffTot >= 0 ? '+' : ''}${fmtNum(diffTot)}</div>
+      <div class="s-label">vs ${prevYrLabel} (${pctTot !== null ? (pctTot >= 0 ? '+' : '') + pctTot.toFixed(1) + '%' : '—'})</div>
+    </div>` : ''}
+    ${yr !== 'all' ? `<div class="summary-card"><div class="s-val mono">${fmtNum(totalLinY0)}</div><div class="s-label">líneas ${prevYrLabel}</div></div>` : ''}`;
+
+  // Info note
+  const note = document.getElementById('info-note');
+  note.classList.remove('hidden');
+  document.getElementById('info-text').innerHTML = yr !== 'all'
+    ? `<strong>Inserciones por Medio.</strong> Revistas (izquierda) y webs (derecha), con desglose por familia y producto. Comparativa con ${prevYrLabel}. Haz clic en ▶ para desplegar.`
+    : '<strong>Inserciones por Medio.</strong> Revistas (izquierda) y webs (derecha). Selecciona un año concreto para ver la comparativa interanual.';
+
+  // Helper: % change badge
+  function pctBadge(y1, y0) {
+    if (yr === 'all') return `<span class="im-pct neutral">—</span>`;
+    if (y0 === 0 && y1 > 0) return `<span class="im-pct up">NUEVO</span>`;
+    if (y1 === 0 && y0 > 0) return `<span class="im-pct down">−100%</span>`;
+    if (y0 === 0 && y1 === 0) return `<span class="im-pct neutral">—</span>`;
+    const diff = y1 - y0, pct = (diff / y0) * 100;
+    const sign = diff >= 0 ? '+' : '';
+    const cls  = diff > 0 ? 'up' : diff < 0 ? 'down' : 'neutral';
+    return `<span class="im-pct ${cls}">${sign}${pct.toFixed(1)}%</span>`;
+  }
+
+  // ── Build one column's HTML ──
+  const prevColLabel = yr !== 'all' ? `Líneas ${prevYrLabel}` : '';
+
+  function buildColumnHtml(medioList, colId) {
+    const isRev   = colId === 'rev';
+    const color   = isRev ? '#2563eb' : '#7c3aed';
+    const emoji   = isRev ? '📰' : '🌐';
+    const label   = isRev ? 'Revistas' : 'Webs';
+    const shadow  = isRev ? 'rgba(37,99,235,0.2)' : 'rgba(124,58,237,0.2)';
+    const headerBg = isRev ? '#eff4ff' : '#f5f0ff';
+    const headerBorder = isRev ? '#c7d9ff' : '#ddd0ff';
+
+    let html = `<div class="im-wrap">
+      <div style="padding:10px 16px 9px; background:${headerBg}; border-bottom:2px solid ${headerBorder}; display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.09em; color:#5a5a7a;">
+        <span style="width:8px;height:8px;border-radius:50%;background:${color};box-shadow:0 0 0 2px ${shadow};flex-shrink:0;display:inline-block;"></span>
+        ${emoji} ${label} <span style="font-weight:400;opacity:0.55;margin-left:4px;">(${medioList.length})</span>
+      </div>
+      <div class="im-header-row">
+        <span>Publicación / Familia / Producto</span>
+        <span>Líneas ${yr !== 'all' ? yr : ''}</span>
+        <span>${prevColLabel}</span>
+        <span>% var.</span>
+        <span class="im-separator"></span>
+        <span>Ingreso ${yr !== 'all' ? yr : ''}</span>
+        <span>Ingreso ${prevColLabel}</span>
+        <span>% var.</span>
+      </div>`;
+
+    medioList.forEach((medio, mi) => {
+      const y1Data = treeY1[medio] || { n: 0, fams: {} };
+      const y0Data = treeY0[medio] || { n: 0, fams: {} };
+      const nY1 = y1Data.n, nY0 = y0Data.n;
+      const medioId = `im-${colId}-medio-${mi}`;
+
+      const allFams = [...new Set([...Object.keys(y1Data.fams), ...Object.keys(y0Data.fams)])].sort();
+
+      const famBlocksHtml = allFams.map((fam, fi) => {
+        const fY1 = y1Data.fams[fam] || { n: 0, prods: {} };
+        const fY0 = y0Data.fams[fam] || { n: 0, prods: {} };
+        const fnY1 = fY1.n, fnY0 = fY0.n;
+        const famId = `im-${colId}-fam-${mi}-${fi}`;
+
+        const allProds = [...new Set([...Object.keys(fY1.prods), ...Object.keys(fY0.prods)])].sort();
+        const prodsHtml = allProds.map(prod => {
+          const pDataY1 = fY1.prods[prod] || { n: 0, ing: 0 };
+          const pDataY0 = fY0.prods[prod] || { n: 0, ing: 0 };
+          const pY1 = pDataY1.n, pY0 = pDataY0.n;
+          const pIngY1 = Math.round(pDataY1.ing), pIngY0 = Math.round(pDataY0.ing);
+          return `<div class="im-prod-row">
+            <div class="im-prod-name"><span class="im-prod-dot"></span>${prod}</div>
+            <div class="im-prod-num">${fmtNum(pY1)}</div>
+            <div class="im-prod-num">${yr !== 'all' ? fmtNum(pY0) : ''}</div>
+            <div>${pctBadge(pY1, pY0)}</div>
+            <div class="im-separator"></div>
+            <div class="im-prod-num">${fmtNum(pIngY1)}€</div>
+            <div class="im-prod-num">${yr !== 'all' ? fmtNum(pIngY0) + '€' : ''}</div>
+            <div>${pctBadge(pIngY1, pIngY0)}</div>
+          </div>`;
+        }).join('');
+
+        const fIngY1 = Math.round(fY1.ing || 0), fIngY0 = Math.round(fY0.ing || 0);
+        return `<div class="im-fam-block">
+          <div class="im-fam-row" onclick="toggleIM('${famId}')">
+            <div class="im-fam-name">
+              <span class="im-toggle" id="imtog-${famId}">▶</span>
+              <span class="im-fam-dot"></span>${fam}
+            </div>
+            <div class="im-num">${fmtNum(fnY1)}</div>
+            <div class="im-num">${yr !== 'all' ? fmtNum(fnY0) : ''}</div>
+            <div>${pctBadge(fnY1, fnY0)}</div>
+            <div class="im-separator"></div>
+            <div class="im-num">${fmtNum(fIngY1)}€</div>
+            <div class="im-num">${yr !== 'all' ? fmtNum(fIngY0) + '€' : ''}</div>
+            <div>${pctBadge(fIngY1, fIngY0)}</div>
+          </div>
+          <div class="im-fam-children" id="${famId}">${prodsHtml}</div>
+        </div>`;
+      }).join('');
+
+      const ingY1 = Math.round(y1Data.ing || 0), ingY0 = Math.round(y0Data.ing || 0);
+      html += `<div class="im-medio-block">
+        <div class="im-medio-row" onclick="toggleIM('${medioId}')">
+          <div class="im-medio-name">
+            <span class="im-toggle" id="imtog-${medioId}">▶</span>
+            <strong>${medio}</strong>
+          </div>
+          <div class="im-num main">${fmtNum(nY1)}</div>
+          <div class="im-num">${yr !== 'all' ? fmtNum(nY0) : ''}</div>
+          <div>${pctBadge(nY1, nY0)}</div>
+          <div class="im-separator"></div>
+          <div class="im-num main">${fmtNum(ingY1)}€</div>
+          <div class="im-num">${yr !== 'all' ? fmtNum(ingY0) + '€' : ''}</div>
+          <div>${pctBadge(ingY1, ingY0)}</div>
+        </div>
+        <div class="im-medio-children" id="${medioId}">${famBlocksHtml}</div>
+      </div>`;
+    });
+
+    html += `</div>`;
+    return html;
+  }
+
+  // ── Render both columns ──
+  document.getElementById('im-container').innerHTML = `
+    <div class="im-two-col">
+      <div>${buildColumnHtml(revistas, 'rev')}</div>
+      <div>${buildColumnHtml(webs, 'web')}</div>
+    </div>`;
+}
+
+// ─── PS — PRODUCTOS SELECCIONADOS ────────────────────────────────────────────
+function renderPS() {
+  const yr    = document.getElementById('f-year').value;
+  const canal = document.getElementById('f-canal').value;
+
+  document.getElementById('table-wrap').style.display = 'none';
+  document.getElementById('im-container').style.display = 'none';
+  document.getElementById('ps-container').style.display = '';
+
+  const excludedProducts = [
+    'Article (Production Cost)',
+    'Content Ignition',
+    'COSTES FABRICACION PRODUCCION',
+    'COSTES REALIZACION',
+    'Gastos Ejecución (Production Cost)'
+  ];
+
+  const rowsY1 = DATA.filter(r => {
+    if (yr !== 'all' && r._year !== yr) return false;
+    if (canal !== 'all' && r._canal !== canal) return false;
+    if (selectedMonths.size > 0 && !selectedMonths.has(r._mes)) return false;
+    if (excludedProducts.includes(r._prod)) return false;
+    return true;
+  });
+
+  let rowsY0 = [];
+  let prevYrLabel = '';
+  if (yr !== 'all') {
+    prevYrLabel = String(parseInt(yr, 10) - 1);
+    rowsY0 = DATA.filter(r => {
+      if (r._year !== prevYrLabel) return false;
+      if (canal !== 'all' && r._canal !== canal) return false;
+      if (selectedMonths.size > 0 && !selectedMonths.has(r._mes)) return false;
+      if (excludedProducts.includes(r._prod)) return false;
+      return true;
+    });
+  }
+
+  // Build tree: producto → publicacion (aggregated by fam+prod key)
+  // n = total lines, nPos = positive lines only, ing = positive sum only (for avg price)
+  function buildProdTree(rows) {
+    const tree = {}; // key = fam+'|||'+prod
+    rows.forEach(r => {
+      const fam  = r._fam  || '(sin familia)';
+      const prod = r._prod || '(sin producto)';
+      const pub  = r._pub  || '(sin publicación)';
+      const ing  = parseFloat(r._ingreso) || 0;
+      const key  = fam + '|||' + prod;
+      if (!tree[key]) tree[key] = { fam, prod, n: 0, nPos: 0, ing: 0, pubs: {} };
+      tree[key].n++;
+      if (ing > 0) { tree[key].nPos++; tree[key].ing += ing; }
+      if (!tree[key].pubs[pub]) tree[key].pubs[pub] = { n: 0, nPos: 0, ing: 0 };
+      tree[key].pubs[pub].n++;
+      if (ing > 0) { tree[key].pubs[pub].nPos++; tree[key].pubs[pub].ing += ing; }
+    });
+    return tree;
+  }
+
+  const treeY1 = buildProdTree(rowsY1);
+  const treeY0 = buildProdTree(rowsY0);
+
+  // Helper: average price según zeroMode
+  // Con ceros: ing / n_total  → precio real incluyendo lo regalado
+  // Sin ceros: ing / nPos     → precio real de venta
+  function avgPrice(n, nPos, ing) {
+    if (zeroMode === 'con') return n    > 0 ? ing / n    : 0;
+    else                    return nPos > 0 ? ing / nPos : 0;
+  }
+
+  function pctBadge(y1, y0) {
+    if (yr === 'all') return `<span class="im-pct neutral">—</span>`;
+    if (y0 === 0 && y1 > 0) return `<span class="im-pct up">NUEVO</span>`;
+    if (y1 === 0 && y0 > 0) return `<span class="im-pct down">−100%</span>`;
+    if (y0 === 0 && y1 === 0) return `<span class="im-pct neutral">—</span>`;
+    const diff = y1 - y0, pct = (diff / Math.abs(y0)) * 100;
+    const sign = diff >= 0 ? '+' : '';
+    const cls  = diff > 0 ? 'up' : diff < 0 ? 'down' : 'neutral';
+    return `<span class="im-pct ${cls}">${sign}${pct.toFixed(1)}%</span>`;
+  }
+
+  const prevColLabel = yr !== 'all' ? `Líneas ${prevYrLabel}` : '';
+  const prevAvgLabel = yr !== 'all' ? `Pres. medio ${prevYrLabel}` : '';
+
+  // Lookup helper: get data from tree by fam+prod key
+  function getData(tree, fam, prod) {
+    const key = fam + '|||' + prod;
+    return tree[key] || { n: 0, nPos: 0, ing: 0, pubs: {} };
+  }
+
+  // For social aggregation: sum multiple fam+prod keys
+  function getDataMulti(tree, pairs) {
+    const result = { n: 0, nPos: 0, ing: 0, pubs: {} };
+    pairs.forEach(([fam, prod]) => {
+      const d = getData(tree, fam, prod);
+      result.n += d.n;
+      result.nPos += d.nPos;
+      result.ing += d.ing;
+      Object.entries(d.pubs).forEach(([pub, pd]) => {
+        if (!result.pubs[pub]) result.pubs[pub] = { n: 0, nPos: 0, ing: 0 };
+        result.pubs[pub].n += pd.n;
+        result.pubs[pub].nPos += pd.nPos;
+        result.pubs[pub].ing += pd.ing;
+      });
+    });
+    return result;
+  }
+
+  // ── Structure definitions ──
+  const PRINT_STRUCTURE = [
+    { fam: 'Sponsorship', prods: [
+      { label: 'DOBLE PAGINA BRANDED', fam: 'Sponsorship', prod: 'DOBLE PAGINA BRANDED' },
+      { label: 'PAGINA BRANDED',       fam: 'Sponsorship', prod: 'PAGINA BRANDED' },
+    ], famProds: ['DOBLE PAGINA BRANDED', 'PAGINA BRANDED'] },
+    { fam: 'CONVENCIONAL', prods: [
+      { label: 'CONTRAPORTADA',      fam: 'CONVENCIONAL', prod: 'CONTRAPORTADA' },
+      { label: '1ª DOBLE PAGINA',    fam: 'CONVENCIONAL', prod: '1ª DOBLE PAGINA' },
+      { label: '2ª DOBLE PAGINA',    fam: 'CONVENCIONAL', prod: '2ª DOBLE PAGINA' },
+      { label: '3ª DOBLE PAGINA',    fam: 'CONVENCIONAL', prod: '3ª DOBLE PAGINA' },
+      { label: '1ª PAGINA IMPAR',    fam: 'CONVENCIONAL', prod: '1ª PAGINA IMPAR' },
+      { label: '2ª PAGINA IMPAR',    fam: 'CONVENCIONAL', prod: '2ª PAGINA IMPAR' },
+      { label: '3ª PAGINA IMPAR',    fam: 'CONVENCIONAL', prod: '3ª PAGINA IMPAR' },
+      { label: '1ª PAGINA PAR',      fam: 'CONVENCIONAL', prod: '1ª PAGINA PAR' },
+      { label: '2ª PAGINA PAR',      fam: 'CONVENCIONAL', prod: '2ª PAGINA PAR' },
+      { label: '1 PAGINA',           fam: 'CONVENCIONAL', prod: '1 PAGINA' },
+      { label: 'DOBLE PAGINA',       fam: 'CONVENCIONAL', prod: 'DOBLE PAGINA' },
+      { label: 'DOBLE PAGINA 1º TERCIO', fam: 'CONVENCIONAL', prod: 'DOBLE PAGINA 1º TERCIO' },
+    ]},
+    { fam: 'Curated', prods: [
+      { label: 'CURATED', fam: 'Curated', prod: 'CURATED' },
+    ], famProds: ['CURATED'] },
+    { fam: 'ELEMENTOS ESPECIALES', prods: [
+      { label: 'ENCARTE',           fam: 'ELEMENTOS ESPECIALES', prod: 'ENCARTE' },
+      { label: 'PRODUCTO EN PORTADA', fam: 'ELEMENTOS ESPECIALES', prod: 'PRODUCTO EN PORTADA' },
+      { label: 'SACHETTE',          fam: 'ELEMENTOS ESPECIALES', prod: 'SACHETTE' },
+    ]},
+  ];
+
+  const DIGITAL_STRUCTURE = [
+    { fam: 'Sponsorship', prods: [
+      { label: 'Article Translated',          fam: 'Sponsorship', prod: 'Article Translated' },
+      { label: 'Branded Content',             fam: 'Sponsorship', prod: 'Branded Content' },
+      { label: 'Branded Content Sindicated',  fam: 'Sponsorship', prod: 'Branded Content Sindicated' },
+      { label: 'Branded Content video',       fam: 'Sponsorship', prod: 'Branded Content video' },
+      { label: 'Editorial Native',            fam: 'Sponsorship', prod: 'Editorial Native' },
+      { label: 'Sponsored Newsletter',        fam: 'Sponsorship', prod: 'Sponsored Newsletter' },
+    ], famProds: ['Article Translated', 'Branded Content', 'Branded Content Sindicated', 'Branded Content video', 'Editorial Native', 'Sponsored Newsletter'] },
+    { fam: 'Curated', prods: [
+      { label: 'Curated',               fam: 'Curated', prod: 'Curated' },
+      { label: 'Curated Portada Digital', fam: 'Curated', prod: 'Curated Portada Digital' },
+      { label: 'Curated Vídeo',         fam: 'Curated', prod: 'Curated Vídeo' },
+    ], famProds: ['Curated', 'Curated Portada Digital', 'Curated Vídeo'] },
+    { fam: 'Social Networks', prods: [
+      { label: 'Social Paid',    multi: [
+          ['Social Networks','Facebook (sponsored Post)'],
+          ['Social Networks','Instagram (sponsored Post)'],
+          ['Social Networks','Tik Tok (sponsored Post)'],
+        ]},
+      { label: 'Social Organic', multi: [
+          ['Social Networks','Insider'],
+          ['Social Networks','Instagram (Orgánico)'],
+          ['Social Networks','Redes sociales organicas'],
+        ]},
+    ]},
+    { fam: 'Display', prods: [
+      { label: 'Take over Premium',  fam: 'Display', prod: 'Take over Premium' },
+      { label: 'Take over Standard', fam: 'Display', prod: 'Take over Standard' },
+    ]},
+    { fam: 'Programatica Display Directo',   prods: [] },
+    { fam: 'Programatica Display Indirecto', prods: [] },
+    { fam: 'Video Programatico Indirecto',   prods: [] },
+    { fam: 'Video Programatico Directo',     prods: [] },
+    { fam: 'Video',                          prods: [] },
+  ];
+
+  // ── Build column HTML ──
+  function buildPSColumnHtml(structure, colId, colLabel, emoji, color, shadow, headerBg, headerBorder) {
+    let html = `<div class="im-wrap">
+      <div style="padding:10px 16px 9px; background:${headerBg}; border-bottom:2px solid ${headerBorder}; display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.09em; color:#5a5a7a;">
+        <span style="width:8px;height:8px;border-radius:50%;background:${color};box-shadow:0 0 0 2px ${shadow};flex-shrink:0;display:inline-block;"></span>
+        ${emoji} ${colLabel}
+      </div>
+      <div class="im-header-row">
+        <span>Familia / Producto / Publicación</span>
+        <span>Líneas ${yr !== 'all' ? yr : ''}</span>
+        <span>${prevColLabel}</span>
+        <span>% var.</span>
+        <span class="im-separator"></span>
+        <span>Pres. medio ${yr !== 'all' ? yr : ''}</span>
+        <span>${prevAvgLabel}</span>
+        <span>% var.</span>
+      </div>`;
+
+    structure.forEach((famDef, fi) => {
+      const famId = `ps-${colId}-fam-${fi}`;
+
+      // Total real de la familia desde el Excel (independiente de los productos listados)
+      // Si la familia comparte nombre entre Print y Digital, filtrar por los productos exactos de esta columna
+      let famY1 = { n: 0, nPos: 0, ing: 0 }, famY0 = { n: 0, nPos: 0, ing: 0 };
+      const famProdFilter = famDef.famProds ? r => r._fam === famDef.fam && famDef.famProds.includes(r._prod) : r => r._fam === famDef.fam;
+      rowsY1.filter(famProdFilter).forEach(r => { const v = parseFloat(r._ingreso)||0; famY1.n++; if (v > 0) { famY1.nPos++; famY1.ing += v; } });
+      rowsY0.filter(famProdFilter).forEach(r => { const v = parseFloat(r._ingreso)||0; famY0.n++; if (v > 0) { famY0.nPos++; famY0.ing += v; } });
+
+      if (famDef.prods.length === 0) {
+        // family-only row: ya calculado arriba
+      }
+
+      const famAvgY1 = avgPrice(famY1.n, famY1.nPos, famY1.ing);
+      const famAvgY0 = avgPrice(famY0.n, famY0.nPos, famY0.ing);
+
+      const prodsHtml = famDef.prods.map((pd, pi) => {
+        const prodId = `ps-${colId}-prod-${fi}-${pi}`;
+        const d1 = pd.multi ? getDataMulti(treeY1, pd.multi) : getData(treeY1, pd.fam, pd.prod);
+        const d0 = pd.multi ? getDataMulti(treeY0, pd.multi) : getData(treeY0, pd.fam, pd.prod);
+        const avgY1 = avgPrice(d1.n, d1.nPos, d1.ing);
+        const avgY0 = avgPrice(d0.n, d0.nPos, d0.ing);
+
+        // Publication rows (children of product)
+        const allPubs = [...new Set([...Object.keys(d1.pubs), ...Object.keys(d0.pubs)])].sort();
+        const pubsHtml = allPubs.map(pub => {
+          const p1 = d1.pubs[pub] || { n: 0, nPos: 0, ing: 0 };
+          const p0 = d0.pubs[pub] || { n: 0, nPos: 0, ing: 0 };
+          const pAvg1 = avgPrice(p1.n, p1.nPos, p1.ing);
+          const pAvg0 = avgPrice(p0.n, p0.nPos, p0.ing);
+          const hasDataY1 = zeroMode === 'con' ? p1.n > 0 : p1.nPos > 0;
+          const hasDataY0 = zeroMode === 'con' ? p0.n > 0 : p0.nPos > 0;
+          // líneas visibles según modo
+          const pL1 = zeroMode === 'con' ? p1.n : p1.nPos;
+          const pL0 = zeroMode === 'con' ? p0.n : p0.nPos;
+          return `<div class="ps-pub-row">
+            <div class="im-prod-name" style="padding-left:8px"><span style="width:4px;height:4px;border-radius:50%;background:#b0b0c8;flex-shrink:0;display:inline-block;"></span>${pub}</div>
+            <div class="im-prod-num">${fmtNum(pL1)}</div>
+            <div class="im-prod-num">${yr !== 'all' ? fmtNum(pL0) : ''}</div>
+            <div>${pctBadge(pL1, pL0)}</div>
+            <div class="im-separator"></div>
+            <div class="im-prod-num" style="color:var(--accent);font-weight:700">${hasDataY1 ? fmt(pAvg1) : '—'}</div>
+            <div class="im-prod-num">${yr !== 'all' && hasDataY0 ? fmt(pAvg0) : ''}</div>
+            <div>${pctBadge(pAvg1, pAvg0)}</div>
+          </div>`;
+        }).join('');
+
+        const hasD1 = zeroMode === 'con' ? d1.n > 0 : d1.nPos > 0;
+        const hasD0 = zeroMode === 'con' ? d0.n > 0 : d0.nPos > 0;
+        // líneas visibles a nivel producto
+        const dL1 = zeroMode === 'con' ? d1.n : d1.nPos;
+        const dL0 = zeroMode === 'con' ? d0.n : d0.nPos;
+        return `<div class="ps-prod-block">
+          <div class="ps-prod-row" onclick="toggleIM('${prodId}')">
+            <div class="im-prod-name" style="font-weight:600;font-size:12px;color:var(--text2)">
+              <span class="im-toggle" id="imtog-${prodId}">▶</span>
+              <span class="im-fam-dot" style="background:${color}"></span>
+              ${pd.label}
+            </div>
+            <div class="im-num">${fmtNum(dL1)}</div>
+            <div class="im-num">${yr !== 'all' ? fmtNum(dL0) : ''}</div>
+            <div>${pctBadge(dL1, dL0)}</div>
+            <div class="im-separator"></div>
+            <div class="im-num" style="color:var(--accent);font-size:13px;font-weight:700">${hasD1 ? fmt(avgY1) : '—'}</div>
+            <div class="im-num">${yr !== 'all' && hasD0 ? fmt(avgY0) : ''}</div>
+            <div>${pctBadge(avgY1, avgY0)}</div>
+          </div>
+          <div class="im-fam-children" id="${prodId}">${pubsHtml}</div>
+        </div>`;
+      }).join('');
+
+      const hasFamY1 = zeroMode === 'con' ? famY1.n > 0 : famY1.nPos > 0;
+      const hasFamY0 = zeroMode === 'con' ? famY0.n > 0 : famY0.nPos > 0;
+      // líneas visibles a nivel familia
+      const famL1 = zeroMode === 'con' ? famY1.n : famY1.nPos;
+      const famL0 = zeroMode === 'con' ? famY0.n : famY0.nPos;
+      html += `<div class="im-fam-block">
+        <div class="im-fam-row" onclick="toggleIM('${famId}')">
+          <div class="im-fam-name">
+            <span class="im-toggle open" id="imtog-${famId}">▶</span>
+            <span class="im-fam-dot" style="background:${color}"></span>
+            ${famDef.fam}
+          </div>
+          <div class="im-num">${fmtNum(famL1)}</div>
+          <div class="im-num">${yr !== 'all' ? fmtNum(famL0) : ''}</div>
+          <div>${pctBadge(famL1, famL0)}</div>
+          <div class="im-separator"></div>
+          <div class="im-num" style="color:var(--accent);font-size:13px;font-weight:700">${hasFamY1 ? fmt(famAvgY1) : '—'}</div>
+          <div class="im-num">${yr !== 'all' && hasFamY0 ? fmt(famAvgY0) : ''}</div>
+          <div>${pctBadge(famAvgY1, famAvgY0)}</div>
+        </div>
+        <div class="im-fam-children open" id="${famId}">${prodsHtml}</div>
+      </div>`;
+    });
+
+    html += `</div>`;
+    return html;
+  }
+
+  const printHtml   = buildPSColumnHtml(PRINT_STRUCTURE,   'print',   'Productos Print',   '📰', '#2563eb', 'rgba(37,99,235,0.2)',   '#eff4ff', '#c7d9ff');
+  const digitalHtml = buildPSColumnHtml(DIGITAL_STRUCTURE, 'digital', 'Productos Digitales', '🌐', '#7c3aed', 'rgba(124,58,237,0.2)', '#f5f0ff', '#ddd0ff');
+
+  // Summary
+  const totalY1 = rowsY1.length, totalY0 = rowsY0.length;
+  document.getElementById('summary-bar').innerHTML = `
+    <div class="summary-card accent"><div class="s-val">${PRINT_STRUCTURE.reduce((s,f)=>s+f.prods.length,0)}</div><div class="s-label">productos print</div></div>
+    <div class="summary-card" style="border-top:3px solid var(--purple)"><div class="s-val">${DIGITAL_STRUCTURE.reduce((s,f)=>s+f.prods.length,0)}</div><div class="s-label">productos digitales</div></div>
+    <div class="summary-card purple"><div class="s-val">${fmtNum(totalY1)}</div><div class="s-label">líneas ${yr !== 'all' ? yr : 'totales'}</div></div>`;
+
+  const note = document.getElementById('info-note');
+  note.classList.remove('hidden');
+  document.getElementById('info-text').innerHTML = `<strong>Productos Seleccionados.</strong> Vista fija por familias y productos. Las columnas de precio muestran el presupuesto medio (ingreso neto ÷ líneas). Cada producto se puede plegar/desplegar para ver las publicaciones.`;
+
+  document.getElementById('ps-container').innerHTML = `
+    <div class="im-two-col">
+      <div>${printHtml}</div>
+      <div>${digitalHtml}</div>
+    </div>`;
+}
+
+// ── Extra CSS for PS product rows ──
+(function addPSStyles() {
+  const s = document.createElement('style');
+  s.textContent = `
+    .ps-prod-block { border-bottom: 1px solid var(--border); }
+    .ps-prod-block:last-child { border-bottom: none; }
+    .ps-prod-row {
+      display: grid;
+      grid-template-columns: 1fr 70px 70px 60px 20px 95px 95px 65px;
+      align-items: center;
+      padding: 7px 14px 7px 46px;
+      background: #f9fafc;
+      cursor: pointer;
+      border-bottom: 1px solid #eaecf2;
+      gap: 4px;
+      transition: background 0.12s;
+    }
+    .ps-prod-row:hover { background: #eef0f8; }
+    .ps-pub-row {
+      display: grid;
+      grid-template-columns: 1fr 70px 70px 60px 20px 95px 95px 65px;
+      align-items: center;
+      padding: 5px 14px 5px 68px;
+      background: #fafbfd;
+      border-bottom: 1px solid #eef0f5;
+      gap: 4px;
+    }
+    .ps-pub-row:last-child { border-bottom: none; }
+  `;
+  document.head.appendChild(s);
+})();
+
+function toggleIM(id) {
+  const el  = document.getElementById(id);
+  const tog = document.getElementById('imtog-' + id);
+  if (!el) return;
+  const isOpen = el.classList.toggle('open');
+  if (tog) tog.classList.toggle('open', isOpen);
+}
+
+// ─── TOOLTIP HELPERS ──────────────────────────────────────────────────────────
+let _openTooltip = null;
+
+function positionTooltip(trigger, box) {
+  const tr = trigger.getBoundingClientRect();
+  const margin = 10;
+  box.style.visibility = 'hidden'; box.style.display = 'block';
+  const bh = box.offsetHeight, bw = box.offsetWidth;
+  box.style.display = ''; box.style.visibility = '';
+  const goBelow = tr.top < bh + margin + 20 && (window.innerHeight - tr.bottom) >= bh + margin;
+  box.classList.toggle('tt-above', !goBelow);
+  box.classList.toggle('tt-below', goBelow);
+  let top = goBelow ? tr.bottom + 8 : tr.top - bh - 8;
+  top = Math.max(margin, Math.min(top, window.innerHeight - bh - margin));
+  let left = tr.left + tr.width / 2 - bw / 2;
+  left = Math.max(margin, Math.min(left, window.innerWidth - bw - margin));
+  box.style.top = top + 'px'; box.style.left = left + 'px';
+}
+
+function showTooltip(triggerId, boxId) {
+  if (_openTooltip && _openTooltip !== boxId) document.getElementById(_openTooltip)?.classList.remove('tt-visible');
+  const trigger = document.getElementById(triggerId), box = document.getElementById(boxId);
+  if (!trigger || !box) return;
+  positionTooltip(trigger, box); box.classList.add('tt-visible'); _openTooltip = boxId;
+}
+function hideTooltip(id) { document.getElementById(id)?.classList.remove('tt-visible'); if (_openTooltip === id) _openTooltip = null; }
+function toggleTooltip(e, triggerId, boxId) {
+  e.stopPropagation();
+  const box = document.getElementById(boxId); if (!box) return;
+  const isOpen = box.classList.contains('tt-visible');
+  if (_openTooltip && _openTooltip !== boxId) document.getElementById(_openTooltip)?.classList.remove('tt-visible');
+  if (isOpen) { box.classList.remove('tt-visible'); _openTooltip = null; }
+  else { positionTooltip(document.getElementById(triggerId), box); box.classList.add('tt-visible'); _openTooltip = boxId; }
+}
+function closeTipsOutside(e) {
+  if (_openTooltip && !e.target.closest('.tooltip-wrap')) { document.getElementById(_openTooltip)?.classList.remove('tt-visible'); _openTooltip = null; }
+}
+
+// ─── SECTOR EXPAND ────────────────────────────────────────────────────────────
+function toggleSector(rowId) {
+  const sectorRow = document.getElementById('sector-' + rowId);
+  const btn = document.getElementById('btn-' + rowId);
+  if (!sectorRow) return;
+  const isOpen = sectorRow.style.display !== 'none';
+  sectorRow.style.display = isOpen ? 'none' : '';
+  btn?.classList.toggle('open', !isOpen);
+}
+</script>
+</body>
+</html>
