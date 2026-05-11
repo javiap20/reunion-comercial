@@ -1141,6 +1141,30 @@ th.th-yoy {
         <div id="mc-area-table"></div>
       </div>
 
+      <!-- ─── BLOQUE FAMILIAS POR MES ─── -->
+      <div class="chart-card" style="padding:0;overflow:hidden">
+        <div style="padding:12px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.07em;flex:1">📁 Familias · Evolución mensual</span>
+          <span style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace" id="fam-mes-year-label"></span>
+        </div>
+        <div style="padding:8px 18px 6px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:10px;color:var(--text3);font-style:italic;line-height:1.6">
+          Para cada familia y mes: <strong style="color:var(--text2)">ingreso año actual</strong> (pequeño) · <strong style="color:var(--green)">% crecimiento</strong>/<strong style="color:var(--red)">descrecimiento</strong> vs año anterior (grande) · diferencia en € (pequeño). Solo visible si hay un año concreto seleccionado.
+        </div>
+        <div id="fam-mes-table" style="overflow-x:auto"></div>
+      </div>
+      <!-- ─── TABLA FAMILIAS: EVOLUCIÓN MENSUAL ACUMULADA ─── -->
+      <div class="chart-card" style="padding:0;overflow:hidden">
+        <div style="padding:12px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.07em;flex:1">📊 Familias · Evolución mensual ACUMULADA</span>
+          <span style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace" id="fam-mes-acum-year-label"></span>
+        </div>
+        <div style="padding:8px 18px 6px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:10px;color:var(--text3);font-style:italic;line-height:1.6">
+          Igual que el bloque anterior pero con <strong style="color:var(--text2)">valores acumulados</strong>: Ene, Ene+Feb, Ene+Feb+Mar... Solo visible si hay un año concreto seleccionado.
+        </div>
+        <div id="fam-mes-acum-table" style="overflow-x:auto"></div>
+      </div>
+
+
       <!-- ─── TABLA MULTI-CANAL: SECTORES ─── -->
       <div class="chart-card" style="padding:0;overflow:hidden">
         <div style="padding:12px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
@@ -1482,6 +1506,22 @@ const FAM_PRINT=new Set(['CERTIFICACIÓN','CONVENCIONAL','Curated','ELEMENTOS ES
 
 const COLORS=['#2563eb','#16a34a','#b45309','#7c3aed','#db2777','#0d9488','#dc2626','#ca8a04','#0284c7','#65a30d'];
 const CANAL_PILL={'DIGITAL':'pill-digital','PRINT':'pill-print','EVENTOS':'pill-eventos','OTROS':'pill-amber'};
+// Función para desplegar/colapsar productos de una familia
+function toggleFamProducts(famId) {
+  const toggle = document.getElementById('toggle-' + famId);
+  const rows = document.querySelectorAll('.prod-row-' + famId);
+  const isExpanded = toggle.style.transform === 'rotate(90deg)';
+  
+  if (isExpanded) {
+    toggle.style.transform = 'rotate(0deg)';
+    rows.forEach(r => r.style.display = 'none');
+  } else {
+    toggle.style.transform = 'rotate(90deg)';
+    rows.forEach(r => r.style.display = 'table-row');
+  }
+}
+
+
 
 const DIGITAL_DISPLAY_NAMES={
   'www.caranddriver.com/es':'Car & Driver','www.cosmopolitan.com/es':'Cosmopolitan',
@@ -2260,6 +2300,8 @@ function renderMain(){
   // Nueva tabla multi-canal
   mRenderMCTable('mc-mes-table','mc-mes-year-label',filt,hasPrev?prevFilt:null,yr,'mes');
   mRenderMCTable('mc-area-table','mc-area-year-label',filt,hasPrev?prevFilt:null,yr,'area');
+  mRenderFamiliasMes('fam-mes-table','fam-mes-year-label',filt,hasPrev?prevFilt:null,yr);
+  mRenderFamiliasMesAcum('fam-mes-acum-table','fam-mes-acum-year-label',filt,hasPrev?prevFilt:null,yr);
   mRenderMCTable('mc-sector-table','mc-sector-year-label',filt,hasPrev?prevFilt:null,yr,'sector');
   mRenderMCTable('mc-pubdig-table','mc-pubs-year-label',filt,hasPrev?prevFilt:null,yr,'pubdig');
   mRenderMCTable('mc-pubprint-table',null,filt,hasPrev?prevFilt:null,yr,'pubprint');
@@ -2273,6 +2315,419 @@ function renderMain(){
   }
   // Actualizar bloque Publicaciones por Área
   if(typeof renderAreaPub === 'function') renderAreaPub();
+}
+
+function mRenderFamiliasMes(elId, lblId, filt, prevFilt, yr) {
+  const el = document.getElementById(elId);
+  const lbl = document.getElementById(lblId);
+  if (!el) return;
+  const hasPrev = prevFilt && prevFilt.length > 0;
+  if (lbl) lbl.textContent = yr && yr !== 'all' ? '(' + yr + ')' : '';
+
+  if (!yr || yr === 'all' || !hasPrev) {
+    el.innerHTML = '<div style="padding:28px;text-align:center;font-size:12px;color:var(--text3);font-style:italic">Selecciona un año concreto para ver la comparativa mensual por familia.</div>';
+    return;
+  }
+
+  const famSet = new Set();
+  filt.forEach(r => { if (r._famLabel) famSet.add(r._famLabel); });
+  prevFilt.forEach(r => { if (r._famLabel) famSet.add(r._famLabel); });
+  if (!famSet.size) { el.innerHTML = '<div style="padding:28px;text-align:center;font-size:12px;color:var(--text3)">Sin datos</div>'; return; }
+
+  const famList = [...famSet].sort((a, b) => {
+    const totA = filt.filter(r => r._famLabel === a).reduce((s, r) => s + r._ingreso, 0);
+    const totB = filt.filter(r => r._famLabel === b).reduce((s, r) => s + r._ingreso, 0);
+    return totB - totA;
+  });
+
+  const curMap = new Map(), prevMap = new Map();
+  const curProdMap = new Map(), prevProdMap = new Map();
+  
+  filt.forEach(r => {
+    if (!r._famLabel || !r._mesRaw) return;
+    const fk = r._famLabel, mk = r._mesRaw, pk = r._prod || '(sin producto)';
+    if (!curMap.has(fk)) curMap.set(fk, new Map());
+    curMap.get(fk).set(mk, (curMap.get(fk).get(mk) || 0) + r._ingreso);
+    if (!curProdMap.has(fk)) curProdMap.set(fk, new Map());
+    if (!curProdMap.get(fk).has(pk)) curProdMap.get(fk).set(pk, new Map());
+    curProdMap.get(fk).get(pk).set(mk, (curProdMap.get(fk).get(pk).get(mk) || 0) + r._ingreso);
+  });
+  
+  prevFilt.forEach(r => {
+    if (!r._famLabel || !r._mesRaw) return;
+    const fk = r._famLabel, mk = r._mesRaw, pk = r._prod || '(sin producto)';
+    if (!prevMap.has(fk)) prevMap.set(fk, new Map());
+    prevMap.get(fk).set(mk, (prevMap.get(fk).get(mk) || 0) + r._ingreso);
+    if (!prevProdMap.has(fk)) prevProdMap.set(fk, new Map());
+    if (!prevProdMap.get(fk).has(pk)) prevProdMap.get(fk).set(pk, new Map());
+    prevProdMap.get(fk).get(pk).set(mk, (prevProdMap.get(fk).get(pk).get(mk) || 0) + r._ingreso);
+  });
+
+  function getFamCanal(famLabel) {
+    const base = famLabel.replace(/ \((digital|print)\)$/i, '').trim();
+    if (/\(digital\)/i.test(famLabel)) return 'DIGITAL';
+    if (/\(print\)/i.test(famLabel)) return 'PRINT';
+    if (FAM_DIGITAL.has(base)) return 'DIGITAL';
+    if (FAM_PRINT.has(base)) return 'PRINT';
+    return 'OTROS';
+  }
+
+  const mesesCols = MESES_ORDER.map(m => MESES_SHORT[m] || m);
+
+  function buildGroupTable(groupFams, bgHeader, colorHeader, labelHeader, iconHeader) {
+    if (!groupFams.length) return '';
+    let h = '';
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px 8px;border-bottom:2px solid ' + bgHeader + ';margin-top:0">';
+    h += '<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' + colorHeader + ';flex-shrink:0"></span>';
+    h += '<span style="font-family:\'Syne\',sans-serif;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:' + colorHeader + '">' + iconHeader + ' ' + labelHeader + '</span>';
+    h += '</div>';
+    h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:900px">';
+    h += '<thead><tr style="background:var(--bg3);border-bottom:1px solid var(--border2)">';
+    h += '<th style="text-align:left;padding:7px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);font-weight:600;min-width:160px;position:sticky;left:0;background:var(--bg3);z-index:1">Familia</th>';
+    MESES_ORDER.forEach((m, i) => {
+      h += '<th style="text-align:center;padding:7px 6px;font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);font-weight:600;min-width:80px;border-left:1px solid var(--border)">' + mesesCols[i] + '</th>';
+    });
+    h += '</tr></thead><tbody>';
+
+    let rowIdx = 0;
+    let famCounter = 0;
+    groupFams.forEach(fam => {
+      const cur = curMap.get(fam) || new Map();
+      const prev = prevMap.get(fam) || new Map();
+      const hasData = MESES_ORDER.some(m => (cur.get(m) || 0) > 0 || (prev.get(m) || 0) > 0);
+      if (!hasData) return;
+
+      const famId = 'fam-' + labelHeader.toLowerCase().replace(/[^a-z]/g,'') + '-' + famCounter;
+      famCounter++;
+
+      h += '<tr data-fam-row="' + famId + '" style="border-bottom:1px solid var(--border);cursor:pointer;' + (rowIdx % 2 === 0 ? 'background:var(--bg2)' : 'background:rgba(240,241,244,0.4)') + '" onclick="toggleFamProducts(\'' + famId + '\')">';
+      h += '<td style="padding:8px 14px;font-family:\'Syne\',sans-serif;font-size:11px;font-weight:600;color:var(--text);position:sticky;left:0;background:inherit;z-index:1;border-right:2px solid var(--border2)">';
+      h += '<span class="fam-toggle" id="toggle-' + famId + '" style="display:inline-block;width:12px;margin-right:6px;transition:transform 0.2s;font-size:10px">▶</span>';
+      h += esc(fam) + '</td>';
+
+      MESES_ORDER.forEach(m => {
+        const cv = cur.get(m) || 0;
+        const pv = prev.get(m) || 0;
+        if (cv === 0 && pv === 0) {
+          h += '<td style="text-align:center;padding:6px 4px;border-left:1px solid var(--border);color:var(--text3);font-size:10px">—</td>';
+          return;
+        }
+        const pct = pv > 0 ? ((cv - pv) / pv) * 100 : null;
+        const diff = cv - pv;
+        const pctColor = pct === null ? 'var(--text3)' : pct >= 0 ? 'var(--green)' : 'var(--red)';
+        const pctSign = pct !== null && pct >= 0 ? '+' : '';
+        const pctStr = pct !== null ? (pctSign + pct.toFixed(1) + '%') : 'NUEVO';
+        const diffSign = diff >= 0 ? '+' : '';
+        const diffStr = diffSign + fmtFull(diff);
+        h += '<td style="text-align:center;padding:5px 4px;border-left:1px solid var(--border);vertical-align:middle">';
+        if (cv > 0) h += '<div style="font-family:\'DM Mono\',monospace;font-size:9px;color:var(--text3);line-height:1.3">' + fmtFull(cv) + '</div>';
+        h += '<div style="font-family:\'DM Mono\',monospace;font-size:13px;font-weight:700;color:' + pctColor + ';line-height:1.2">' + pctStr + '</div>';
+        h += '<div style="font-family:\'DM Mono\',monospace;font-size:9px;color:' + pctColor + ';opacity:0.8;line-height:1.3">' + diffStr + '</div>';
+        h += '</td>';
+      });
+      h += '</tr>';
+
+      // Filas de productos
+      const prodCur = curProdMap.get(fam) || new Map();
+      const prodPrev = prevProdMap.get(fam) || new Map();
+      const allProds = new Set([...prodCur.keys(), ...prodPrev.keys()]);
+      const prodList = [...allProds].sort((a, b) => {
+        const totA = MESES_ORDER.reduce((s, m) => s + ((prodCur.get(a) || new Map()).get(m) || 0), 0);
+        const totB = MESES_ORDER.reduce((s, m) => s + ((prodCur.get(b) || new Map()).get(m) || 0), 0);
+        return totB - totA;
+      });
+
+      prodList.forEach(prod => {
+        const pCur = prodCur.get(prod) || new Map();
+        const pPrev = prodPrev.get(prod) || new Map();
+        const hasProdData = MESES_ORDER.some(m => (pCur.get(m) || 0) > 0 || (pPrev.get(m) || 0) > 0);
+        if (!hasProdData) return;
+
+        h += '<tr class="prod-row-' + famId + '" style="display:none;border-bottom:1px solid var(--border);background:rgba(99,102,241,0.08)">';
+        h += '<td style="padding:6px 14px 6px 32px;font-family:\'Syne\',sans-serif;font-size:10px;font-weight:500;color:var(--text2);position:sticky;left:0;background:rgba(99,102,241,0.08);z-index:1;border-right:2px solid var(--border2)">';
+        h += '↳ ' + esc(prod) + '</td>';
+
+        MESES_ORDER.forEach(m => {
+          const cv = pCur.get(m) || 0;
+          const pv = pPrev.get(m) || 0;
+          if (cv === 0 && pv === 0) {
+            h += '<td style="text-align:center;padding:5px 4px;border-left:1px solid var(--border);color:var(--text3);font-size:9px;background:rgba(99,102,241,0.08)">—</td>';
+            return;
+          }
+          const pct = pv > 0 ? ((cv - pv) / pv) * 100 : null;
+          const diff = cv - pv;
+          const pctColor = pct === null ? 'var(--text3)' : pct >= 0 ? 'var(--green)' : 'var(--red)';
+          const pctSign = pct !== null && pct >= 0 ? '+' : '';
+          const pctStr = pct !== null ? (pctSign + pct.toFixed(1) + '%') : 'NUEVO';
+          const diffSign = diff >= 0 ? '+' : '';
+          const diffStr = diffSign + fmtFull(diff);
+          h += '<td style="text-align:center;padding:4px 4px;border-left:1px solid var(--border);vertical-align:middle;background:rgba(99,102,241,0.08)">';
+          if (cv > 0) h += '<div style="font-family:\'DM Mono\',monospace;font-size:8px;color:var(--text3);line-height:1.2">' + fmtFull(cv) + '</div>';
+          h += '<div style="font-family:\'DM Mono\',monospace;font-size:11px;font-weight:600;color:' + pctColor + ';line-height:1.2">' + pctStr + '</div>';
+          h += '<div style="font-family:\'DM Mono\',monospace;font-size:8px;color:' + pctColor + ';opacity:0.8;line-height:1.2">' + diffStr + '</div>';
+          h += '</td>';
+        });
+        h += '</tr>';
+      });
+
+      rowIdx++;
+    });
+
+    h += '</tbody></table></div>';
+    return h;
+  }
+
+  const digitalFams = famList.filter(f => getFamCanal(f) === 'DIGITAL');
+  const printFams = famList.filter(f => getFamCanal(f) === 'PRINT');
+  const otrosFams = famList.filter(f => getFamCanal(f) === 'OTROS');
+
+  let html = '';
+  html += buildGroupTable(digitalFams, 'var(--blue)', 'var(--blue)', 'Digital', '🖥');
+  if (printFams.length && digitalFams.length) {
+    html += '<div style="height:1px;background:var(--border2);margin:0"></div>';
+  }
+  html += buildGroupTable(printFams, 'var(--green)', 'var(--green)', 'Print', '📰');
+  if (otrosFams.length) {
+    html += '<div style="height:1px;background:var(--border2);margin:0"></div>';
+    html += buildGroupTable(otrosFams, 'var(--text3)', 'var(--text3)', 'Eventos', '🎪');
+  }
+
+  el.innerHTML = html;
+}
+
+function mRenderFamiliasMesAcum(elId, lblId, filt, prevFilt, yr) {
+  const el = document.getElementById(elId);
+  const lbl = document.getElementById(lblId);
+  if (!el) return;
+  const hasPrev = prevFilt && prevFilt.length > 0;
+  if (lbl) lbl.textContent = yr && yr !== 'all' ? '(' + yr + ')' : '';
+
+  if (!yr || yr === 'all' || !hasPrev) {
+    el.innerHTML = '<div style="padding:28px;text-align:center;font-size:12px;color:var(--text3);font-style:italic">Selecciona un año concreto para ver la comparativa mensual por familia.</div>';
+    return;
+  }
+
+  // Detectar qué meses tienen datos en el filtro actual
+  const mesesConDatos = new Set();
+  filt.forEach(r => { if (r._mesRaw) mesesConDatos.add(r._mesRaw); });
+  prevFilt.forEach(r => { if (r._mesRaw) mesesConDatos.add(r._mesRaw); });
+
+  const famSet = new Set();
+  filt.forEach(r => { if (r._famLabel) famSet.add(r._famLabel); });
+  prevFilt.forEach(r => { if (r._famLabel) famSet.add(r._famLabel); });
+  if (!famSet.size) { el.innerHTML = '<div style="padding:28px;text-align:center;font-size:12px;color:var(--text3)">Sin datos</div>'; return; }
+
+  const famList = [...famSet].sort((a, b) => {
+    const totA = filt.filter(r => r._famLabel === a).reduce((s, r) => s + r._ingreso, 0);
+    const totB = filt.filter(r => r._famLabel === b).reduce((s, r) => s + r._ingreso, 0);
+    return totB - totA;
+  });
+
+  const curMapMes = new Map(), prevMapMes = new Map();
+  const curProdMapMes = new Map(), prevProdMapMes = new Map();
+  
+  filt.forEach(r => {
+    if (!r._famLabel || !r._mesRaw) return;
+    const fk = r._famLabel, mk = r._mesRaw, pk = r._prod || '(sin producto)';
+    if (!curMapMes.has(fk)) curMapMes.set(fk, new Map());
+    curMapMes.get(fk).set(mk, (curMapMes.get(fk).get(mk) || 0) + r._ingreso);
+    if (!curProdMapMes.has(fk)) curProdMapMes.set(fk, new Map());
+    if (!curProdMapMes.get(fk).has(pk)) curProdMapMes.get(fk).set(pk, new Map());
+    curProdMapMes.get(fk).get(pk).set(mk, (curProdMapMes.get(fk).get(pk).get(mk) || 0) + r._ingreso);
+  });
+  
+  prevFilt.forEach(r => {
+    if (!r._famLabel || !r._mesRaw) return;
+    const fk = r._famLabel, mk = r._mesRaw, pk = r._prod || '(sin producto)';
+    if (!prevMapMes.has(fk)) prevMapMes.set(fk, new Map());
+    prevMapMes.get(fk).set(mk, (prevMapMes.get(fk).get(mk) || 0) + r._ingreso);
+    if (!prevProdMapMes.has(fk)) prevProdMapMes.set(fk, new Map());
+    if (!prevProdMapMes.get(fk).has(pk)) prevProdMapMes.get(fk).set(pk, new Map());
+    prevProdMapMes.get(fk).get(pk).set(mk, (prevProdMapMes.get(fk).get(pk).get(mk) || 0) + r._ingreso);
+  });
+
+  const curMap = new Map(), prevMap = new Map();
+  const curProdMap = new Map(), prevProdMap = new Map();
+
+  famList.forEach(fam => {
+    const curMes = curMapMes.get(fam) || new Map();
+    const prevMes = prevMapMes.get(fam) || new Map();
+    curMap.set(fam, new Map());
+    prevMap.set(fam, new Map());
+    
+    let curAcum = 0, prevAcum = 0;
+    MESES_ORDER.forEach(m => {
+      if (mesesConDatos.has(m)) {
+        curAcum += curMes.get(m) || 0;
+        prevAcum += prevMes.get(m) || 0;
+        curMap.get(fam).set(m, curAcum);
+        prevMap.get(fam).set(m, prevAcum);
+      }
+    });
+
+    const prodCurMes = curProdMapMes.get(fam) || new Map();
+    const prodPrevMes = prevProdMapMes.get(fam) || new Map();
+    curProdMap.set(fam, new Map());
+    prevProdMap.set(fam, new Map());
+    
+    const allProds = new Set([...prodCurMes.keys(), ...prodPrevMes.keys()]);
+    allProds.forEach(prod => {
+      const pCurMes = prodCurMes.get(prod) || new Map();
+      const pPrevMes = prodPrevMes.get(prod) || new Map();
+      curProdMap.get(fam).set(prod, new Map());
+      prevProdMap.get(fam).set(prod, new Map());
+      
+      let pCurAcum = 0, pPrevAcum = 0;
+      MESES_ORDER.forEach(m => {
+        if (mesesConDatos.has(m)) {
+          pCurAcum += pCurMes.get(m) || 0;
+          pPrevAcum += pPrevMes.get(m) || 0;
+          curProdMap.get(fam).get(prod).set(m, pCurAcum);
+          prevProdMap.get(fam).get(prod).set(m, pPrevAcum);
+        }
+      });
+    });
+  });
+
+  function getFamCanal(famLabel) {
+    const base = famLabel.replace(/ \((digital|print)\)$/i, '').trim();
+    if (/\(digital\)/i.test(famLabel)) return 'DIGITAL';
+    if (/\(print\)/i.test(famLabel)) return 'PRINT';
+    if (FAM_DIGITAL.has(base)) return 'DIGITAL';
+    if (FAM_PRINT.has(base)) return 'PRINT';
+    return 'OTROS';
+  }
+
+  const mesesCols = MESES_ORDER.map(m => MESES_SHORT[m] || m);
+
+  function buildGroupTable(groupFams, bgHeader, colorHeader, labelHeader, iconHeader) {
+    if (!groupFams.length) return '';
+    let h = '';
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px 8px;border-bottom:2px solid ' + bgHeader + ';margin-top:0">';
+    h += '<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' + colorHeader + ';flex-shrink:0"></span>';
+    h += '<span style="font-family:\'Syne\',sans-serif;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:' + colorHeader + '">' + iconHeader + ' ' + labelHeader + '</span>';
+    h += '</div>';
+    h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:900px">';
+    h += '<thead><tr style="background:var(--bg3);border-bottom:1px solid var(--border2)">';
+    h += '<th style="text-align:left;padding:7px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);font-weight:600;min-width:160px;position:sticky;left:0;background:var(--bg3);z-index:1">Familia</th>';
+    MESES_ORDER.forEach((m, i) => {
+      h += '<th style="text-align:center;padding:7px 6px;font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);font-weight:600;min-width:80px;border-left:1px solid var(--border)">' + mesesCols[i] + '</th>';
+    });
+    h += '</tr></thead><tbody>';
+
+    let rowIdx = 0;
+    let famCounter = 0;
+    groupFams.forEach(fam => {
+      const cur = curMap.get(fam) || new Map();
+      const prev = prevMap.get(fam) || new Map();
+      const hasData = MESES_ORDER.some(m => (cur.get(m) || 0) > 0 || (prev.get(m) || 0) > 0);
+      if (!hasData) return;
+
+      const famId = 'fam-acum-' + labelHeader.toLowerCase().replace(/[^a-z]/g,'') + '-' + famCounter;
+      famCounter++;
+
+      h += '<tr data-fam-row="' + famId + '" style="border-bottom:1px solid var(--border);cursor:pointer;' + (rowIdx % 2 === 0 ? 'background:var(--bg2)' : 'background:rgba(240,241,244,0.4)') + '" onclick="toggleFamProducts(\'' + famId + '\')">';
+      h += '<td style="padding:8px 14px;font-family:\'Syne\',sans-serif;font-size:11px;font-weight:600;color:var(--text);position:sticky;left:0;background:inherit;z-index:1;border-right:2px solid var(--border2)">';
+      h += '<span class="fam-toggle" id="toggle-' + famId + '" style="display:inline-block;width:12px;margin-right:6px;transition:transform 0.2s;font-size:10px">▶</span>';
+      h += esc(fam) + '</td>';
+
+      MESES_ORDER.forEach(m => {
+        if (!mesesConDatos.has(m)) {
+          h += '<td style="text-align:center;padding:6px 4px;border-left:1px solid var(--border);color:var(--text3);font-size:10px">—</td>';
+          return;
+        }
+        const cv = cur.get(m) || 0;
+        const pv = prev.get(m) || 0;
+        if (cv === 0 && pv === 0) {
+          h += '<td style="text-align:center;padding:6px 4px;border-left:1px solid var(--border);color:var(--text3);font-size:10px">—</td>';
+          return;
+        }
+        const pct = pv > 0 ? ((cv - pv) / pv) * 100 : null;
+        const diff = cv - pv;
+        const pctColor = pct === null ? 'var(--text3)' : pct >= 0 ? 'var(--green)' : 'var(--red)';
+        const pctSign = pct !== null && pct >= 0 ? '+' : '';
+        const pctStr = pct !== null ? (pctSign + pct.toFixed(1) + '%') : 'NUEVO';
+        const diffSign = diff >= 0 ? '+' : '';
+        const diffStr = diffSign + fmtFull(diff);
+        h += '<td style="text-align:center;padding:5px 4px;border-left:1px solid var(--border);vertical-align:middle">';
+        if (cv > 0) h += '<div style="font-family:\'DM Mono\',monospace;font-size:9px;color:var(--text3);line-height:1.3">' + fmtFull(cv) + '</div>';
+        h += '<div style="font-family:\'DM Mono\',monospace;font-size:13px;font-weight:700;color:' + pctColor + ';line-height:1.2">' + pctStr + '</div>';
+        h += '<div style="font-family:\'DM Mono\',monospace;font-size:9px;color:' + pctColor + ';opacity:0.8;line-height:1.3">' + diffStr + '</div>';
+        h += '</td>';
+      });
+      h += '</tr>';
+
+      const prodCur = curProdMap.get(fam) || new Map();
+      const prodPrev = prevProdMap.get(fam) || new Map();
+      const allProds = new Set([...prodCur.keys(), ...prodPrev.keys()]);
+      const mesesOrdenados = MESES_ORDER.filter(m => mesesConDatos.has(m));
+      const lastMes = mesesOrdenados[mesesOrdenados.length - 1];
+      const prodList = [...allProds].sort((a, b) => {
+        const totA = (prodCur.get(a) || new Map()).get(lastMes) || 0;
+        const totB = (prodCur.get(b) || new Map()).get(lastMes) || 0;
+        return totB - totA;
+      });
+
+      prodList.forEach(prod => {
+        const pCur = prodCur.get(prod) || new Map();
+        const pPrev = prodPrev.get(prod) || new Map();
+        const hasProdData = MESES_ORDER.some(m => mesesConDatos.has(m) && ((pCur.get(m) || 0) > 0 || (pPrev.get(m) || 0) > 0));
+        if (!hasProdData) return;
+
+        h += '<tr class="prod-row-' + famId + '" style="display:none;border-bottom:1px solid var(--border);background:rgba(99,102,241,0.08)">';
+        h += '<td style="padding:6px 14px 6px 32px;font-family:\'Syne\',sans-serif;font-size:10px;font-weight:500;color:var(--text2);position:sticky;left:0;background:rgba(99,102,241,0.08);z-index:1;border-right:2px solid var(--border2)">';
+        h += '↳ ' + esc(prod) + '</td>';
+
+        MESES_ORDER.forEach(m => {
+          if (!mesesConDatos.has(m)) {
+            h += '<td style="text-align:center;padding:5px 4px;border-left:1px solid var(--border);color:var(--text3);font-size:9px;background:rgba(99,102,241,0.08)">—</td>';
+            return;
+          }
+          const cv = pCur.get(m) || 0;
+          const pv = pPrev.get(m) || 0;
+          if (cv === 0 && pv === 0) {
+            h += '<td style="text-align:center;padding:5px 4px;border-left:1px solid var(--border);color:var(--text3);font-size:9px;background:rgba(99,102,241,0.08)">—</td>';
+            return;
+          }
+          const pct = pv > 0 ? ((cv - pv) / pv) * 100 : null;
+          const diff = cv - pv;
+          const pctColor = pct === null ? 'var(--text3)' : pct >= 0 ? 'var(--green)' : 'var(--red)';
+          const pctSign = pct !== null && pct >= 0 ? '+' : '';
+          const pctStr = pct !== null ? (pctSign + pct.toFixed(1) + '%') : 'NUEVO';
+          const diffSign = diff >= 0 ? '+' : '';
+          const diffStr = diffSign + fmtFull(diff);
+          h += '<td style="text-align:center;padding:4px 4px;border-left:1px solid var(--border);vertical-align:middle;background:rgba(99,102,241,0.08)">';
+          if (cv > 0) h += '<div style="font-family:\'DM Mono\',monospace;font-size:8px;color:var(--text3);line-height:1.2">' + fmtFull(cv) + '</div>';
+          h += '<div style="font-family:\'DM Mono\',monospace;font-size:11px;font-weight:600;color:' + pctColor + ';line-height:1.2">' + pctStr + '</div>';
+          h += '<div style="font-family:\'DM Mono\',monospace;font-size:8px;color:' + pctColor + ';opacity:0.8;line-height:1.2">' + diffStr + '</div>';
+          h += '</td>';
+        });
+        h += '</tr>';
+      });
+
+      rowIdx++;
+    });
+
+    h += '</tbody></table></div>';
+    return h;
+  }
+
+  const digitalFams = famList.filter(f => getFamCanal(f) === 'DIGITAL');
+  const printFams = famList.filter(f => getFamCanal(f) === 'PRINT');
+  const otrosFams = famList.filter(f => getFamCanal(f) === 'OTROS');
+
+  let html = '';
+  html += buildGroupTable(digitalFams, 'var(--blue)', 'var(--blue)', 'Digital', '🖥');
+  if (printFams.length && digitalFams.length) {
+    html += '<div style="height:1px;background:var(--border2);margin:0"></div>';
+  }
+  html += buildGroupTable(printFams, 'var(--green)', 'var(--green)', 'Print', '📰');
+  if (otrosFams.length) {
+    html += '<div style="height:1px;background:var(--border2);margin:0"></div>';
+    html += buildGroupTable(otrosFams, 'var(--text3)', 'var(--text3)', 'Eventos', '🎪');
+  }
+
+  el.innerHTML = html;
 }
 
 function mGroupBy(data,keyFn,valFn){const m=new Map();data.forEach(r=>{const k=keyFn(r);m.set(k,(m.get(k)||0)+valFn(r));});return[...m.entries()].map(([k,v])=>({k,v})).sort((a,b)=>b.v-a.v);}
