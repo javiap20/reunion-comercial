@@ -1174,6 +1174,16 @@ th.th-yoy {
         <div id="mc-sector-table"></div>
       </div>
 
+      <!-- ─── TABLA TOTAL MARCAS HEARST ─── -->
+      <div class="chart-card" style="padding:0;overflow:hidden">
+        <div style="padding:12px 18px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#7c3aed;flex-shrink:0"></span>
+          <span style="font-size:12px;font-weight:600;color:#7c3aed;text-transform:uppercase;letter-spacing:0.07em;flex:1;font-family:'Syne',sans-serif">🏠 Total Marcas Hearst</span>
+          <span style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace" id="mc-pubtotal-year-label"></span>
+        </div>
+        <div id="mc-pubtotal-table"></div>
+      </div>
+
       <!-- ─── TABLA PUBLICACIONES: dos cards separadas como los demás bloques ─── -->
       <div class="charts-row" style="align-items:start">
 
@@ -1948,6 +1958,27 @@ const BC_PUB_MAP=[
   {digital:'www.womenshealthmag.com/es',canon:"WOMEN'S HEALTH"},
 ];
 const BC_PRINT_CANON={'CAR & DRIVER':'CAR & DRIVER','COSMOPOLITAN':'COSMOPOLITAN','DIEZ MINUTOS':'DIEZ MINUTOS','ELLE':'ELLE','ELLE DECORATION':'ELLE DECORATION','ELLE GOURMET':'ELLE GOURMET','ELLE TRAVEL':'ELLE TRAVEL','ESQUIRE':'ESQUIRE','FOTOGRAMAS & VIDEO':'FOTOGRAMAS','FOTOGRAMAS':'FOTOGRAMAS',"HARPER'S BAZAAR":"HARPER'S BAZAAR","HARPERS BAZAAR":"HARPER'S BAZAAR","MEN'S HEALTH":"MEN'S HEALTH","MENS HEALTH":"MEN'S HEALTH",'NUEVO ESTILO':'NUEVO ESTILO',"RUNNER'S WORLD":"RUNNER'S WORLD","RUNNERS WORLD":"RUNNER'S WORLD","WOMEN'S HEALTH":"WOMEN'S HEALTH","WOMENS HEALTH":"WOMEN'S HEALTH"};
+// ── Mapa de canonización: pub (print/digital) → Marca Hearst visible
+const HEARST_MARCA_MAP={
+  // ELLE
+  'ELLE':'Elle','MI CASA REVISTA':'Nuevo Estilo / Mi Casa',
+  // Elle Gourmet / Elle Travel
+  'ELLE GOURMET':'Elle Gourmet / Elle Travel','ELLE TRAVEL':'Elle Gourmet / Elle Travel',
+  // Resto 1:1
+  'COSMOPOLITAN':'Cosmopolitan',
+  "HARPER'S BAZAAR":"Harper's Bazaar",
+  'ESQUIRE':'Esquire',
+  'FOTOGRAMAS':'Fotogramas',
+  'DIEZ MINUTOS':'Diez Minutos',
+  "MEN'S HEALTH":"Men's Health",
+  'CAR & DRIVER':'Car & Driver',
+  'ELLE DECORATION':'Elle Decor',
+  "WOMEN'S HEALTH":"Women's Health",
+  "RUNNER'S WORLD":"Runner's World",
+  'NUEVO ESTILO':'Nuevo Estilo / Mi Casa',
+};
+// Orden fijo de marcas Hearst en la tabla
+const HEARST_ORDEN=['Elle','Elle Gourmet / Elle Travel','Cosmopolitan',"Harper's Bazaar",'Esquire','Fotogramas','Diez Minutos',"Men's Health",'Car & Driver','Elle Decor',"Women's Health","Runner's World",'Nuevo Estilo / Mi Casa'];
 function normDigitalPub(raw){return raw.trim().replace(/^https?:\/\//i,'').replace(/\/+$/,'').toLowerCase();}
 function canonPub(r){
   if(r._canal==='DIGITAL'){const norm=normDigitalPub(r._pub);const entry=BC_PUB_MAP.find(e=>norm===e.digital||norm.startsWith(e.digital));return entry?entry.canon:null;}
@@ -2303,6 +2334,7 @@ function renderMain(){
   mRenderFamiliasMes('fam-mes-table','fam-mes-year-label',filt,hasPrev?prevFilt:null,yr);
   mRenderFamiliasMesAcum('fam-mes-acum-table','fam-mes-acum-year-label',filt,hasPrev?prevFilt:null,yr);
   mRenderMCTable('mc-sector-table','mc-sector-year-label',filt,hasPrev?prevFilt:null,yr,'sector');
+  mRenderMCTable('mc-pubtotal-table','mc-pubtotal-year-label',filt,hasPrev?prevFilt:null,yr,'pubtotal');
   mRenderMCTable('mc-pubdig-table','mc-pubs-year-label',filt,hasPrev?prevFilt:null,yr,'pubdig');
   mRenderMCTable('mc-pubprint-table',null,filt,hasPrev?prevFilt:null,yr,'pubprint');
   mRenderMCTable('mc-pubeve-table','mc-pubeve-year-label',filt,hasPrev?prevFilt:null,yr,'pubeve');
@@ -2879,13 +2911,30 @@ function mRenderMCTable(elId,labelId,filt,prevFilt,yr,mode){
       if(r._canal==='EVENTOS'){const up=normApos((r._pub||'').trim().toUpperCase());return BC_PRINT_CANON[up]?cleanFromCanon(BC_PRINT_CANON[up]):canonEventoPub(r._pub)||'—';}
       return null;
     }
+    if(mode==='pubtotal'){
+      // Mapear pub a nombre de marca Hearst
+      let canon=null;
+      if(r._canal==='DIGITAL'){
+        const norm=normDigitalPub(r._pub||'');
+        const entry=BC_PUB_MAP.find(e=>norm===e.digital||norm.startsWith(e.digital));
+        if(entry) canon=entry.canon;
+      } else if(r._canal==='PRINT'){
+        const up=normApos((r._pub||'').trim().toUpperCase());
+        canon=BC_PRINT_CANON[up]||null;
+      } else if(r._canal==='EVENTOS'){
+        const up=normApos((r._pub||'').trim().toUpperCase());
+        canon=BC_PRINT_CANON[up]||null;
+        if(!canon){const entry=BC_PUB_MAP.find(e=>normDigitalPub(r._pub||'').startsWith(e.digital));if(entry) canon=entry.canon;}
+      }
+      return canon?( HEARST_MARCA_MAP[canon]||canon ):null;
+    }
     if(mode==='sector') return r._sectorClean||'—';
     return '—';
   }
 
-  const isPub=(mode==='pubdig'||mode==='pubprint'||mode==='pubeve'||mode==='pubprinteve');
-  const activeCanalForMode=mode==='pubdig'?'DIGITAL':mode==='pubprint'?'PRINT':mode==='pubeve'?'EVENTOS':mode==='pubprinteve'?'PRINTEVE':null;
-  const allCanales=mode==='pubprinteve'?['TOTAL','DIGITAL','PRINT','EVENTOS','PRINTEVE']:['TOTAL','DIGITAL','PRINT','EVENTOS'];
+  const isPub=(mode==='pubdig'||mode==='pubprint'||mode==='pubeve'||mode==='pubprinteve'||mode==='pubtotal');
+  const activeCanalForMode=mode==='pubdig'?'DIGITAL':mode==='pubprint'?'PRINT':mode==='pubeve'?'EVENTOS':mode==='pubprinteve'?'PRINTEVE':mode==='pubtotal'?'TOTAL':null;
+  const allCanales=mode==='pubprinteve'?['TOTAL','DIGITAL','PRINT','EVENTOS','PRINTEVE']:mode==='pubtotal'?['TOTAL','DIGITAL','PRINT','EVENTOS']:['TOTAL','DIGITAL','PRINT','EVENTOS'];
 
   function buildMap(rows,canal){
     const m=new Map();
@@ -2922,6 +2971,91 @@ function mRenderMCTable(elId,labelId,filt,prevFilt,yr,mode){
   function deltaClass(delta){return delta===null?'':delta>=0?'mc-pos':'mc-neg';}
   function deltaStr(delta){if(delta===null) return '—';const s=delta>=0?'+':'';return `${s}${delta.toFixed(1)}%`;}
   function brutoStr(bruto){if(bruto===null) return '—';return bruto>=0?`(+${fmtFull(bruto)})`:`(${fmtFull(bruto)})`;}
+
+  // ════════════════════════════════════════
+  // MODO TOTAL MARCAS HEARST — columnas multi-canal
+  // ════════════════════════════════════════
+  if(mode==='pubtotal'){
+    const prevLbl=hasPrev?prevYear:'—';
+    const displayC=['DIGITAL','PRINT','EVENTOS'];
+    const CANAL_LABELS={'DIGITAL':'🖥 Digital','PRINT':'📰 Print','EVENTOS':'🎪 Eventos'};
+    const CANAL_COL={'DIGITAL':COLORS[0],'PRINT':COLORS[1],'EVENTOS':COLORS[2]};
+    const tCur=curTotals['TOTAL']||0, tPrev=hasPrev?(prevTotals['TOTAL']||0):0;
+    const tDelta=hasPrev&&tPrev>0?((tCur-tPrev)/tPrev*100):null;
+    const tBruto=hasPrev?(tCur-tPrev):null;
+    // Ordenar por ingreso total desc (marcas Hearst + cualquier extra)
+    rowKeys.sort((a,b)=>(curMaps['TOTAL'].get(b)||0)-(curMaps['TOTAL'].get(a)||0));
+    let html=`<div style="overflow-x:auto"><table class="mc-table">
+      <thead>
+        <tr>
+          <th rowspan="2" style="text-align:left;vertical-align:bottom;padding-bottom:7px;background:var(--bg3)">Publicación</th>
+          <th colspan="4" class="mc-th-group" style="color:var(--text);background:rgba(245,200,66,0.1)">TOTAL MARCA</th>`;
+    displayC.forEach(c=>{html+=`<th colspan="3" class="mc-th-group" style="color:${CANAL_COL[c]}">${CANAL_LABELS[c]}</th>`;});
+    html+=`</tr><tr>`;
+    // sub-headers TOTAL
+    ['Ingreso',`Δ% vs ${prevLbl}`,'(Bruto)','Peso%'].forEach((lbl,si)=>{
+      const border=si===0?'':'border-left:1px solid var(--border)';
+      html+=`<th class="mc-th-sub" style="${border}">${lbl}</th>`;
+    });
+    // sub-headers por canal
+    displayC.forEach(c=>{
+      ['Ingreso',`Δ%`,'(Bruto)'].forEach((lbl,si)=>{
+        const border=si===0?'border-left:2px solid var(--border2)':'border-left:1px solid var(--border)';
+        html+=`<th class="mc-th-sub" style="${border}">${lbl}</th>`;
+      });
+    });
+    html+=`</tr></thead><tbody>`;
+    // fila TOTAL
+    html+=`<tr class="mc-total"><td>TOTAL</td>
+      <td class="mc-sep">${fmtFull(tCur)}</td>
+      <td class="mc-subsep ${deltaClass(tDelta)}">${deltaStr(tDelta)}</td>
+      <td class="mc-subsep mc-bruto">${brutoStr(tBruto)}</td>
+      <td class="mc-subsep">100%</td>`;
+    displayC.forEach(c=>{
+      const cv=curTotals[c]||0,pv=hasPrev?(prevTotals[c]||0):0;
+      const d=hasPrev&&pv>0?((cv-pv)/pv*100):null;
+      const b=hasPrev?(cv-pv):null;
+      html+=`<td class="mc-sep" style="border-left:2px solid var(--border2)">${fmtFull(cv)}</td>
+        <td class="mc-subsep ${deltaClass(d)}">${deltaStr(d)}</td>
+        <td class="mc-subsep mc-bruto">${brutoStr(b)}</td>`;
+    });
+    html+=`</tr>`;
+    // filas de publicación
+    rowKeys.forEach(key=>{
+      const v=curMaps['TOTAL'].get(key)||0;
+      const pv=hasPrev?(prevMaps['TOTAL']?prevMaps['TOTAL'].get(key)||0:0):0;
+      if(v===0&&pv===0) return;
+      const delta=hasPrev&&pv>0?((v-pv)/pv*100):null;
+      const bruto=hasPrev?(v-pv):null;
+      const peso=tCur>0?((v/tCur)*100):null;
+      const dClass=hasPrev&&pv===0&&v>0?'mc-pos':deltaClass(delta);
+      const dStr=hasPrev&&pv===0&&v>0?'NUEVO':deltaStr(delta);
+      html+=`<tr><td>${esc(key)}</td>
+        <td class="mc-sep">${v>0?fmtFull(v):'—'}</td>
+        <td class="mc-subsep ${dClass}">${dStr}</td>
+        <td class="mc-subsep mc-bruto">${brutoStr(bruto)}</td>
+        <td class="mc-subsep">${peso!==null?peso.toFixed(1)+'%':'—'}</td>`;
+      displayC.forEach(c=>{
+        const cv=curMaps[c].get(key)||0;
+        const cpv=hasPrev?(prevMaps[c]?prevMaps[c].get(key)||0:0):0;
+        if(cv===0&&cpv===0){
+          html+=`<td class="mc-sep" style="border-left:2px solid var(--border2);color:var(--text3);text-align:center">—</td><td class="mc-subsep">—</td><td class="mc-subsep mc-bruto">—</td>`;
+          return;
+        }
+        const cd=hasPrev&&cpv>0?((cv-cpv)/cpv*100):null;
+        const cb=hasPrev?(cv-cpv):null;
+        const cdClass=hasPrev&&cpv===0&&cv>0?'mc-pos':deltaClass(cd);
+        const cdStr=hasPrev&&cpv===0&&cv>0?'NUEVO':deltaStr(cd);
+        html+=`<td class="mc-sep" style="border-left:2px solid var(--border2)">${cv>0?fmtFull(cv):'—'}</td>
+          <td class="mc-subsep ${cdClass}">${cdStr}</td>
+          <td class="mc-subsep mc-bruto">${brutoStr(cb)}</td>`;
+      });
+      html+=`</tr>`;
+    });
+    html+=`</tbody></table></div>`;
+    el.innerHTML=html;
+    return;
+  }
 
   // ════════════════════════════════════════
   // MODO PUBLICACIONES — 4 columnas: Pub | Ingreso | Δ% | (Bruto) | Peso%
