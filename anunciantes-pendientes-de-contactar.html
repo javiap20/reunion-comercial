@@ -2865,7 +2865,7 @@ pubsSorted.forEach(([pub, pubRows])=>{
 
   // Filas reales: ordenadas por ingreso desc
   pubRows.sort((a,b)=>b._ingreso-a._ingreso).forEach(r=>{
-    // Delta vs año anterior — comparamos dentro de la misma publicación
+    // Delta vs año anterior — comparamos dentro de la misma publicación y producto
     const prevIng = prevIngMap.get(r._anun + '|||' + pub + '|||' + (r._prod||'').trim())||0;
     let deltaCell = '<td></td>';
     if(hasPrevYear){
