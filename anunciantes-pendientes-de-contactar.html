@@ -703,6 +703,15 @@ table.main-table td.num{text-align:right;font-family:'DM Mono',monospace;font-si
         </div>
       </div>
 
+      <!-- Bloque contexto anunciantes -->
+      <div id="anun-context-block" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 20px;display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap">
+        <div style="flex:1;min-width:220px">
+          <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;margin-bottom:5px" id="anun-ctx-title">📊 Anunciantes —</div>
+          <div id="anun-ctx-desc" style="font-size:12px;color:var(--text2);line-height:1.7">Selecciona un año para ver el desglose.</div>
+        </div>
+        <div id="anun-ctx-kpis" style="display:flex;gap:8px;flex-wrap:wrap;align-self:center"></div>
+      </div>
+
       <!-- Tabla detalle -->
       <div class="chart-card" id="detalle-inserciones-card">
         <div class="chart-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
@@ -1550,6 +1559,87 @@ function renderMain(){
   if(typeof renderAreaPub === 'function') renderAreaPub();
   // Actualizar Pendientes si está activo
   if(document.getElementById('view-alertas').classList.contains('active')&&typeof renderPendientesContactar==='function') renderPendientesContactar();
+
+  // ── Actualizar bloque contexto tabla de anunciantes ──
+  (function(){
+    const titleEl = document.getElementById('anun-ctx-title');
+    const descEl  = document.getElementById('anun-ctx-desc');
+    const kpisEl  = document.getElementById('anun-ctx-kpis');
+    if(!titleEl||!descEl||!kpisEl) return;
+
+    const yr      = document.getElementById('m-f-year').value;
+    const hasPrev = prevFilt.length > 0;
+    const prevYear= yr!=='all' ? String(parseInt(yr)-1) : '';
+
+    // Meses activos
+    const mesesSel = mChipState&&mChipState.mes&&mChipState.mes.size>0
+      ? [...mChipState.mes].join(', ') : null;
+
+    // Totales
+    const totalAnun  = new Set(filt.map(r=>(r[COL_ANUN]||'').trim())).size;
+    const prevAnunSet= hasPrev ? new Set(prevFilt.map(r=>(r[COL_ANUN]||'').trim())) : null;
+    const prevAnunN  = prevAnunSet ? prevAnunSet.size : 0;
+
+    if(yr==='all'){
+    titleEl.textContent = '📊 Anunciantes — todos los años';
+      descEl.innerHTML = `Desglose global de todas las inserciones disponibles, sin filtro de año. Selecciona un año concreto para ver la comparativa con el ejercicio anterior y el detalle de ganados y perdidos.`;
+      kpisEl.innerHTML = `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center">
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);font-weight:600;margin-bottom:3px">Anunciantes</div>
+        <div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:var(--blue)">${fmtNum(totalAnun)}</div>
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center">
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);font-weight:600;margin-bottom:3px">Ingresos totales</div>
+        <div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:var(--accent)">${fmtFull(total)}</div>
+      </div>`;
+      return;
+    }
+
+    // Título dinámico
+    titleEl.textContent = hasPrev ? `📊 Anunciantes ${yr} vs ${prevYear}` : `📊 Anunciantes ${yr}`;
+
+    // Texto descriptivo
+    let desc = `Desglose de anunciantes de <strong>${yr}</strong>`;
+    if(mesesSel) desc += ` (${mesesSel})`;
+    if(hasPrev){
+      desc += `, comparados con <strong>${prevYear}</strong>`;
+      const ingDelta = prevTotal>0 ? ((total-prevTotal)/prevTotal*100) : null;
+      const ingDiff  = total - prevTotal;
+      if(ingDelta!==null){
+        const sign = ingDelta>=0?'+':'';
+        const cls  = ingDelta>=0?'color:var(--green)':'color:var(--red)';
+        desc += `. La inversión total ha ${ingDelta>=0?'crecido':'caído'} un <strong style="${cls}">${sign}${ingDelta.toFixed(1)}%</strong> (${ingDiff>=0?'+':''}${fmtFull(ingDiff)}) respecto al año anterior`;
+      }
+    }
+    desc += '.';
+
+    if(hasPrev&&nuevosSet&&perdidosSet){
+      const nNuevos  = nuevosSet.size;
+      const nPerdidos= perdidosSet.size;
+      const nRepeat  = totalAnun - nNuevos;
+      desc += ` Incluye <strong>${fmtNum(nRepeat)}</strong> anunciantes que repiten`;
+      if(nNuevos>0)   desc += `, <strong style="color:var(--green)">${fmtNum(nNuevos)} nuevos</strong> que no contrataron en ${prevYear}`;
+      if(nPerdidos>0) desc += ` y <strong style="color:var(--red)">${fmtNum(nPerdidos)} perdidos</strong> que sí estaban en ${prevYear} pero no han contratado en ${yr}`;
+      desc += '.';
+    }
+
+    descEl.innerHTML = desc;
+
+    // KPIs
+    const kpiItems = [
+      {label:`Anunciantes ${yr}`, val:fmtNum(totalAnun), color:'var(--blue)'},
+      {label:'Ingresos', val:fmtFull(total), color:'var(--accent)'},
+    ];
+    if(hasPrev){
+      kpiItems.push({label:`Anunciantes ${prevYear}`, val:fmtNum(prevAnunN), color:'var(--text2)'});
+      if(nuevosSet)   kpiItems.push({label:'Nuevos',   val:fmtNum(nuevosSet.size),   color:'var(--green)'});
+      if(perdidosSet) kpiItems.push({label:'Perdidos', val:fmtNum(perdidosSet.size), color:'var(--red)'});
+    }
+    kpisEl.innerHTML = kpiItems.map(k=>`
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;min-width:90px">
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);font-weight:600;margin-bottom:3px">${k.label}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:${k.color}">${k.val}</div>
+      </div>`).join('');
+  })();
 }
 
 function mGroupBy(data,keyFn,valFn){const m=new Map();data.forEach(r=>{const k=keyFn(r);m.set(k,(m.get(k)||0)+valFn(r));});return[...m.entries()].map(([k,v])=>({k,v})).sort((a,b)=>b.v-a.v);}
@@ -2702,6 +2792,15 @@ function exportDetallePDF(){
     lostMap.forEach(v=>lostRows.push(v));
   }
 
+  // Mapa ingreso previo por anunciante (para mostrar delta en filas reales)
+  const prevIngMap = new Map();
+  if(hasPrevYear){
+    prevRows.forEach(r=>{
+      const anun = (r[COL_ANUN]||'').trim();
+      prevIngMap.set(anun, (prevIngMap.get(anun)||0) + r._ingreso);
+    });
+  }
+
   // ── Helper: construye el bloque HTML de una sección (un canal) ──
   function buildSection(canal, canalLabel, canalColor, allRows){
     // Filas reales de este canal
@@ -2752,15 +2851,33 @@ function exportDetallePDF(){
 
       // Filas reales: ordenadas por ingreso desc
       pubRows.sort((a,b)=>b._ingreso-a._ingreso).forEach(r=>{
+        // Delta vs año anterior
+        const prevIng = prevIngMap.get(r._anun)||0;
+        let deltaCell = '<td></td>';
+        if(hasPrevYear){
+          if(prevIng>0){
+            const pct  = ((r._ingreso - prevIng)/prevIng*100);
+            const diff = r._ingreso - prevIng;
+            const sign = pct>=0?'+':'';
+            const cls  = pct>=0?'delta-pos':'delta-neg';
+            const diffFmt = (diff>=0?'+':'')+fmtFull(diff);
+            deltaCell = `<td style="text-align:right">
+              <span class="${cls}">${sign}${pct.toFixed(1)}%</span><br>
+              <span style="font-size:7px;color:#888;font-weight:400">${diffFmt}</span>
+            </td>`;
+          } else {
+            deltaCell = `<td class="delta-pos" style="text-align:right;font-size:7.5px">NUEVO</td>`;
+          }
+        }
         tableRows += `<tr>
           <td style="padding-left:18px">${esc(r._anun||'')}</td>
           <td>${esc(r._marca||'')}</td>
-          <td style="color:#666;font-size:8.5px">${esc(r._prod||'')}</td>
-          <td style="color:#666;font-size:8.5px">${esc(r._sectorClean||'')}</td>
-          <td style="color:#666;font-size:8.5px">${esc(mapAreaGroup(r._area||''))}</td>
-          <td style="color:#666;font-size:8.5px">${esc(fmtComercial(r._comercial||''))}</td>
-          <td></td>
-          <td style="text-align:right;font-weight:600;color:#1a1d27">${fmt(r._ingreso)}</td>
+          <td style="color:#666;font-size:8px">${esc(r._prod||'')}</td>
+          <td style="color:#666;font-size:8px">${esc(r._sectorClean||'')}</td>
+          <td style="color:#666;font-size:8px">${esc(mapAreaGroup(r._area||''))}</td>
+          <td style="color:#666;font-size:8px">${esc(fmtComercial(r._comercial||''))}</td>
+          ${deltaCell}
+          <td>${fmt(r._ingreso)}</td>
         </tr>`;
       });
 
@@ -2812,11 +2929,16 @@ function exportDetallePDF(){
     return `
     <div class="section-block">
       <div class="section-header" style="border-left:4px solid ${canalColor};background:${canalColor}12">
-        <span style="font-size:15px;font-weight:800;color:${canalColor};letter-spacing:-0.3px">${canalLabel}</span>
-        <span style="font-size:11px;color:#555;margin-left:12px">${numReal} inserciones · ${fmtFull(totalIng)}</span>
-        ${numLost?`<span style="font-size:10px;color:#b91c1c;margin-left:10px;background:#fee2e2;padding:2px 8px;border-radius:4px">⚠ ${numLost} perdidos vs ${prevYear}</span>`:''}
+        <span style="font-size:14px;font-weight:800;color:${canalColor};letter-spacing:-0.3px">${canalLabel}</span>
+        <span style="font-size:10px;color:#555">${numReal} inserciones · ${fmtFull(totalIng)}</span>
+        ${numLost?`<span style="font-size:9px;color:#b91c1c;background:#fee2e2;padding:2px 8px;border-radius:4px">⚠ ${numLost} perdidos vs ${prevYear}</span>`:''}
       </div>
       <table>
+        <colgroup>
+          <col class="c-anun"><col class="c-marca"><col class="c-prod">
+          <col class="c-sector"><col class="c-area"><col class="c-com">
+          <col class="c-estado"><col class="c-ing">
+        </colgroup>
         <thead>
           <tr>
             <th>Anunciante</th>
@@ -2825,7 +2947,7 @@ function exportDetallePDF(){
             <th>Sector</th>
             <th>Área</th>
             <th>Comercial</th>
-            <th style="text-align:center">Estado</th>
+            <th class="th-r">${hasPrevYear ? `% vs ${prevYear}` : 'Estado'}</th>
             <th style="text-align:right">Ingreso neto</th>
           </tr>
         </thead>
@@ -2853,46 +2975,65 @@ function exportDetallePDF(){
 <meta charset="UTF-8">
 <title>Detalle de inserciones · ${yrLabel}</title>
 <style>
-  @page{size:A4 landscape;margin:12mm 10mm 12mm 10mm;}
+  @page{size:A4 portrait;margin:12mm 10mm 12mm 10mm;}
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:9.5px;color:#1a1d27;background:#fff;}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:8.5px;color:#1a1d27;background:#fff;}
 
-  /* Portada / cabecera global */
+  /* Cabecera global */
   .global-header{display:flex;align-items:flex-start;justify-content:space-between;
-    margin-bottom:18px;padding-bottom:12px;border-bottom:2px solid #d4960a;}
-  .brand{font-size:18px;font-weight:800;letter-spacing:-0.4px;color:#1a1d27;}
+    margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid #d4960a;}
+  .brand{font-size:16px;font-weight:800;letter-spacing:-0.4px;color:#1a1d27;}
   .brand span{color:#d4960a;}
-  .meta{font-size:10px;color:#777;margin-top:5px;}
-  .grand-total{font-size:20px;font-weight:800;color:#d4960a;text-align:right;}
-  .grand-sub{font-size:9px;color:#999;text-align:right;margin-top:2px;}
+  .meta{font-size:9px;color:#777;margin-top:4px;}
+  .grand-total{font-size:18px;font-weight:800;color:#d4960a;text-align:right;}
+  .grand-sub{font-size:8.5px;color:#999;text-align:right;margin-top:2px;}
 
   /* Sección por canal */
   .section-block{margin-bottom:0;}
-  .section-header{display:flex;align-items:center;padding:9px 14px;margin-bottom:0;border-radius:6px 6px 0 0;}
+  .section-header{display:flex;align-items:center;gap:8px;padding:7px 12px;margin-bottom:0;border-radius:6px 6px 0 0;flex-wrap:wrap;}
 
   /* Salto entre secciones */
   .page-break{page-break-before:always;}
 
-  /* Tabla */
-  table{width:100%;border-collapse:collapse;font-size:9px;}
+  /* Tabla — columnas ajustadas para A4 vertical */
+  table{width:100%;border-collapse:collapse;font-size:8px;table-layout:fixed;}
+  col.c-anun   {width:22%;}
+  col.c-marca  {width:13%;}
+  col.c-prod   {width:10%;}
+  col.c-sector {width:10%;}
+  col.c-area   {width:9%;}
+  col.c-com    {width:10%;}
+  col.c-estado {width:14%;}
+  col.c-ing    {width:12%;}
+
   thead tr{background:#1a1d27;color:#fff;}
-  thead th{padding:6px 8px;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:0.07em;font-weight:600;white-space:nowrap;}
+  thead th{padding:5px 6px;text-align:left;font-size:7.5px;text-transform:uppercase;
+    letter-spacing:0.06em;font-weight:600;white-space:nowrap;overflow:hidden;}
   thead th:last-child{text-align:right;}
+  thead th.th-r{text-align:right;}
+
   tbody tr{border-bottom:1px solid #e8eaef;}
   tbody tr:nth-child(even){background:#fafbfc;}
-  tbody td{padding:4px 8px;vertical-align:middle;}
-  tbody td:last-child{text-align:right;}
+  tbody td{padding:3.5px 6px;vertical-align:middle;overflow:hidden;
+    white-space:nowrap;text-overflow:ellipsis;}
+  tbody td:last-child{text-align:right;font-weight:600;}
   .lost-row{background:#fff8f8 !important;}
+
   tfoot tr{background:#f5f6f8;border-top:2px solid #d4960a;}
-  tfoot td{padding:6px 8px;font-weight:700;font-size:9.5px;}
+  tfoot td{padding:5px 6px;font-weight:700;font-size:9px;overflow:hidden;}
   tfoot td:last-child{text-align:right;color:#d4960a;}
 
-  .footer{margin-top:10px;font-size:7.5px;color:#bbb;text-align:right;
+  /* Badge delta */
+  .delta-pos{color:#16a34a;font-weight:700;}
+  .delta-neg{color:#b91c1c;font-weight:700;}
+  .delta-neu{color:#888;}
+
+  .footer{margin-top:10px;font-size:7px;color:#bbb;text-align:right;
     border-top:1px solid #e4e6ed;padding-top:5px;}
 
   /* Leyenda final */
-  .legend{margin-top:14px;padding:8px 12px;background:#fff8f8;border:1px solid #fecaca;
-    border-radius:6px;font-size:8.5px;color:#b91c1c;}
+  .legend{margin-top:12px;padding:7px 10px;background:#fff8f8;border:1px solid #fecaca;
+    border-radius:6px;font-size:8px;color:#b91c1c;}
 </style>
 </head>
 <body>
