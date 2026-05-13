@@ -2618,13 +2618,16 @@ function exportPendientesPDF(){
 
     let rows = '';
     pubsSorted.forEach(([pub, pubRows])=>{
-      const anunMap = new Map();
+      // Agrupar por anunciante+producto para no mezclar productos distintos
+      const anunProdMap = new Map();
       pubRows.forEach(r=>{
-        const anun=(r[COL_ANUN]||'').trim();
-        if(!anunMap.has(anun)) anunMap.set(anun,{anun,marca:(r[COL_MARCA]||'').trim(),prod:r._prod||'',sector:r._sectorClean||'',area:mapAreaGroup(r._area||''),comercial:fmtComercial(r._comercial||''),ingreso:0});
-        anunMap.get(anun).ingreso+=r._ingreso;
+        const anun = (r[COL_ANUN]||'').trim();
+        const prod = r._prod||'';
+        const key  = anun+'||'+prod;
+        if(!anunProdMap.has(key)) anunProdMap.set(key,{anun,marca:(r[COL_MARCA]||'').trim(),prod,sector:r._sectorClean||'',area:mapAreaGroup(r._area||''),comercial:fmtComercial(r._comercial||''),ingreso:0});
+        anunProdMap.get(key).ingreso+=r._ingreso;
       });
-      const anunsSorted=[...anunMap.values()].sort((a,b)=>b.ingreso-a.ingreso);
+      const anunsSorted=[...anunProdMap.values()].sort((a,b)=>b.ingreso-a.ingreso);
       const pubTotal=anunsSorted.reduce((s,a)=>s+a.ingreso,0);
 
       rows+=`<tr style="background:${color}10">
