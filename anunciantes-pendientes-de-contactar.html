@@ -2792,10 +2792,8 @@ function exportDetallePDF(){
     lostMap.forEach(v=>lostRows.push(v));
   }
 
-  // Mapa ingreso previo por anunciante+publicación+producto (para mostrar delta en filas reales)
-  // La clave es "anun|||pub|||prod" para comparar exactamente el mismo formato/producto
-  // en la misma publicación. Así IKEA·Elle·IG se compara solo contra IKEA·Elle·IG del año anterior,
-  // no contra todo lo que hizo IKEA en Elle.
+  // Mapa ingreso previo por anunciante+publicación+producto
+  // Clave: "anun|||pub|||prod" → suma total del año anterior para ese combo exacto.
   const prevIngMap = new Map();
   if(hasPrevYear){
     prevRows.forEach(r=>{
@@ -2855,18 +2853,32 @@ function exportDetallePDF(){
         </td>
       </tr>`;
 
+      // Mapa ingreso actual por anun+pub+prod (para comparar totales, no filas individuales)
+      // Si IKEA·Elle·IG tiene dos líneas de 3.500€, curIngMap tendrá 7.000€ → correcto vs prevIngMap.
+      const curIngMap = new Map();
+      pubRows.forEach(r=>{
+        const key = (r[COL_ANUN]||'').trim() + '|||' + pub + '|||' + (r._prod||'').trim();
+        curIngMap.set(key, (curIngMap.get(key)||0) + r._ingreso);
+      });
+
       // Filas reales: ordenadas por ingreso desc
+      // El delta solo se muestra en la primera aparición de cada combo anun+pub+prod
+      const deltaShown = new Set();
       pubRows.sort((a,b)=>b._ingreso-a._ingreso).forEach(r=>{
-        // Delta vs año anterior — comparamos misma publicación Y mismo producto
-        const prevIng = prevIngMap.get(r._anun + '|||' + pub + '|||' + (r._prod||'').trim())||0;
+        const comboKey = (r[COL_ANUN]||'').trim() + '|||' + pub + '|||' + (r._prod||'').trim();
+        const curIng   = curIngMap.get(comboKey)||0;   // total actual del grupo
+        const prevIng  = prevIngMap.get(comboKey)||0;  // total año anterior del grupo
+        const isFirst  = !deltaShown.has(comboKey);
+        if(isFirst) deltaShown.add(comboKey);
+
         let deltaCell = '<td></td>';
-        if(hasPrevYear){
-          if(prevIng>0){
-            const pct  = ((r._ingreso - prevIng)/prevIng*100);
-            const diff = r._ingreso - prevIng;
-            const sign = pct>=0?'+':'';
-            const cls  = pct>=0?'delta-pos':'delta-neg';
-            const diffFmt = (diff>=0?'+':'')+fmtFull(diff);
+        if(hasPrevYear && isFirst){
+          if(prevIng > 0){
+            const pct     = ((curIng - prevIng) / prevIng * 100);
+            const diff    = curIng - prevIng;
+            const sign    = pct >= 0 ? '+' : '';
+            const cls     = pct >= 0 ? 'delta-pos' : 'delta-neg';
+            const diffFmt = (diff >= 0 ? '+' : '') + fmtFull(diff);
             deltaCell = `<td style="text-align:right">
               <span class="${cls}">${sign}${pct.toFixed(1)}%</span><br>
               <span style="font-size:7px;color:#888;font-weight:400">${diffFmt}</span>
