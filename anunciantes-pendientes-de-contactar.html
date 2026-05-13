@@ -2792,15 +2792,17 @@ function exportDetallePDF(){
     lostMap.forEach(v=>lostRows.push(v));
   }
 
-  // Mapa ingreso previo por anunciante+publicación (para mostrar delta en filas reales)
-  // La clave es "anun|||pub" para comparar dentro de la misma publicación,
-  // evitando que ingresos en otras pubs contaminen el % de esta.
+  // Mapa ingreso previo por anunciante+publicación+producto (para mostrar delta en filas reales)
+  // La clave es "anun|||pub|||prod" para comparar exactamente el mismo formato/producto
+  // en la misma publicación. Así IKEA·Elle·IG se compara solo contra IKEA·Elle·IG del año anterior,
+  // no contra todo lo que hizo IKEA en Elle.
   const prevIngMap = new Map();
   if(hasPrevYear){
     prevRows.forEach(r=>{
       const anun = (r[COL_ANUN]||'').trim();
       const pub  = r._pubClean||r._pub||'—';
-      const key  = anun + '|||' + pub;
+      const prod = (r._prod||'').trim();
+      const key  = anun + '|||' + pub + '|||' + prod;
       prevIngMap.set(key, (prevIngMap.get(key)||0) + r._ingreso);
     });
   }
@@ -2855,8 +2857,8 @@ function exportDetallePDF(){
 
       // Filas reales: ordenadas por ingreso desc
       pubRows.sort((a,b)=>b._ingreso-a._ingreso).forEach(r=>{
-        // Delta vs año anterior — comparamos dentro de la misma publicación
-        const prevIng = prevIngMap.get(r._anun + '|||' + pub)||0;
+        // Delta vs año anterior — comparamos misma publicación Y mismo producto
+        const prevIng = prevIngMap.get(r._anun + '|||' + pub + '|||' + (r._prod||'').trim())||0;
         let deltaCell = '<td></td>';
         if(hasPrevYear){
           if(prevIng>0){
