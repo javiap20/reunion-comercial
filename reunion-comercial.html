@@ -1501,6 +1501,7 @@ const COL_MES='Mes inserción',COL_PUB='Publicación',COL_ANUN='Anunciante',
       COL_MARCA='Marca',COL_COMERCIAL='Comercial',COL_SIT='Situación orden',
       COL_FAM='Familia',COL_PROD='Producto',COL_YEAR='Año inserción',
       COL_ING='Imp.Neto a Comisionar',COL_AREA='ÁREAS',COL_SECTOR='Sector',
+      COL_DETALLE='Detalle',
       SHEET_NAME='Analizador general';
 
 const MESES_ORDER=['01 Enero','02 Febrero','03 Marzo','04 Abril','05 Mayo','06 Junio',
@@ -1578,6 +1579,8 @@ function cleanPubName(raw,canal){
   let s=raw.trim();
   if(canal==='DIGITAL'){
     const norm=s.replace(/^https?:\/\//i,'').replace(/\/+$/,'').toLowerCase();
+    // Subrutas de elle.com que pertenecen a Elle Gourmet / Elle Travel
+    if(/^www\.elle\.com\/es\/(gourmet|living\/viajes)(\/|$)/.test(norm)) return 'Elle Gourmet / Elle Travel';
     if(DIGITAL_DISPLAY_NAMES[norm]) return DIGITAL_DISPLAY_NAMES[norm];
     const stripped=norm.replace(/^www\./,'').replace(/\/.*$/,'').split('.')[0];
     return stripped.charAt(0).toUpperCase()+stripped.slice(1);
@@ -1649,6 +1652,7 @@ function processArrayBuffer(buffer,filename){
         _area:String(r[COL_AREA]||'').trim(),
         _sector:String(r[COL_SECTOR]||'').trim(),
         _sectorClean:sectorClean,
+        _detalle:String(r[COL_DETALLE]||'').trim(),
         _famLabel:null
       };
       return row;
@@ -1981,7 +1985,12 @@ const HEARST_MARCA_MAP={
 const HEARST_ORDEN=['Elle','Elle Gourmet / Elle Travel','Cosmopolitan',"Harper's Bazaar",'Esquire','Fotogramas','Diez Minutos',"Men's Health",'Car & Driver','Elle Decor',"Women's Health","Runner's World",'Nuevo Estilo / Mi Casa'];
 function normDigitalPub(raw){return raw.trim().replace(/^https?:\/\//i,'').replace(/\/+$/,'').toLowerCase();}
 function canonPub(r){
-  if(r._canal==='DIGITAL'){const norm=normDigitalPub(r._pub);const entry=BC_PUB_MAP.find(e=>norm===e.digital||norm.startsWith(e.digital));return entry?entry.canon:null;}
+  if(r._canal==='DIGITAL'){
+    const norm=normDigitalPub(r._pub);
+    const det=normDigitalPub(r._detalle||'');
+    if(/^www\.elle\.com\/es\/(gourmet|living\/viajes)(\/|$)/.test(det)) return 'ELLE GOURMET';
+    if(/^www\.elle\.com\/es\/(gourmet|living\/viajes)(\/|$)/.test(norm)) return 'ELLE GOURMET';
+    const entry=BC_PUB_MAP.find(e=>norm===e.digital||norm.startsWith(e.digital));return entry?entry.canon:null;}
   if(r._canal==='PRINT'){const up=r._pub.trim().toUpperCase();return BC_PRINT_CANON[up]||null;}
   return null;
 }
@@ -2916,8 +2925,11 @@ function mRenderMCTable(elId,labelId,filt,prevFilt,yr,mode){
       let canon=null;
       if(r._canal==='DIGITAL'){
         const norm=normDigitalPub(r._pub||'');
-        const entry=BC_PUB_MAP.find(e=>norm===e.digital||norm.startsWith(e.digital));
-        if(entry) canon=entry.canon;
+        const det=normDigitalPub(r._detalle||'');
+        if(/^www\.elle\.com\/es\/(gourmet|living\/viajes)(\/|$)/.test(det)){canon='ELLE GOURMET';}
+        else if(/^www\.elle\.com\/es\/(gourmet|living\/viajes)(\/|$)/.test(norm)){canon='ELLE GOURMET';}
+        else{const entry=BC_PUB_MAP.find(e=>norm===e.digital||norm.startsWith(e.digital));
+        if(entry) canon=entry.canon;}
       } else if(r._canal==='PRINT'){
         const up=normApos((r._pub||'').trim().toUpperCase());
         canon=BC_PRINT_CANON[up]||null;
